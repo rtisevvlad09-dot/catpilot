@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Котъ-Лётчикъ · Крылья Имперіи</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐱</text></svg>">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;0,700;1,400&family=Inter:wght@300;400;500;600&family=IM+Fell+English+SC&display=swap" rel="stylesheet">
+
+<!-- Стили -->
+<link rel="stylesheet" href="css/main.css?v=2025">
+<link rel="stylesheet" href="css/components.css?v=2025">
+<link rel="stylesheet" href="css/screens.css?v=2025">
+<link rel="stylesheet" href="css/game.css?v=2025">
+
+<!-- ═══════════════════════════════════════════════════════
+     ⚠️ YANDEX GAMES SDK — ОБЯЗАТЕЛЬНО ПЕРЕД main.js!
+     ═══════════════════════════════════════════════════════ -->
+<script src="https://yandex.ru/games/sdk/v2"></script>
+</head>
+<body>
+
+<!-- Загрузочный экран -->
+<div id="loading">
+  <div class="spinner"></div>
+  <div class="loading-text">КОТЪ-ЛЁТЧИКЪ</div>
+  <div class="loading-sub">Загружаемъ Имперію...</div>
+</div>
+
+<!-- Контейнер игры -->
+<div id="app">
+  <!-- Фоновые слои -->
+  <div class="bg-layer"></div>
+  <div class="bg-ornament"></div>
+  <div class="bg-vignette"></div>
+  <div class="bg-frame"></div>
+</div>
+
+<!-- Уведомления -->
+<div id="toast"></div>
+
+<!-- Диалоги -->
+<div id="dialog">
+  <div class="box">
+    <h3 id="dTitle"></h3>
+    <p id="dText"></p>
+    <div class="btns" id="dBtns"></div>
+  </div>
+</div>
+
+<!-- Менеджеръ модулей (ПОСЛѢ SDK!) -->
+<script src="js/main.js?v=2025"></script>
+
+</body>
+</html>

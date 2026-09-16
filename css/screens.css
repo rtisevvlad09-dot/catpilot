@@ -1,0 +1,101 @@
+/* ═══════════════════════════════════════════════════════════
+   🖥️ СТИЛИ ЭКРАНОВ
+   ═══════════════════════════════════════════════════════════ */
+
+/* ─────────────────────────────────────────────────────────
+   ЭКРАН МЕНЮ
+   ───────────────────────────────────────────────────────── */
+#s-menu .content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 24px;
+  max-width: 520px;
+  width: 100%;
+  position: relative;
+  z-index: 2;
+}
+
+.menu-emblem {
+  width: 140px;
+  height: 140px;
+  margin-bottom: 24px;
+  animation: float 6s ease-in-out infinite;
+  filter: drop-shadow(0 12px 32px rgba(212, 168, 75, 0.4));
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0) rotate(-1deg); }
+  50% { transform: translateY(-12px) rotate(1deg); }
+}
+
+.menu-stats {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin: 24px 0 32px;
+}
+
+.menu-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  max-width: 320px;
+}
+
+.menu-motto {
+  font-family: 'IM Fell English SC', serif;
+  font-style: italic;
+  color: rgba(250, 244, 232, 0.45);
+  font-size: 14px;
+  margin-top: 32px;
+  letter-spacing: 0.15em;
+  text-align: center;
+}
+
+.menu-footer {
+  position: absolute;
+  bottom: 20px;
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-family: 'IM Fell English SC', serif;
+  font-size: 10px;
+  color: rgba(250, 244, 232, 0.3);
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  z-index: 2;
+}
+
+/* Угловые орнаменты */
+.corner-ornament {
+  position: absolute;
+  width: 60px;
+  height: 60px;
+  opacity: 0.3;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.corner-ornament.tl { top: 20px; left: 20px; }
+.corner-ornament.tr { top: 20px; right: 20px; transform: scaleX(-1); }
+.corner-ornament.bl { bottom: 20px; left: 20px; transform: scaleY(-1); }
+.corner-ornament.br { bottom: 20px; right: 20px; transform: scale(-1, -1); }
+
+/* Адаптивность для меню */
+@media (max-width: 640px) {
+  .menu-emblem { width: 110px; height: 110px; }
+  .menu-actions { max-width: 280px; }
+  .btn-xl { padding: 16px 32px; font-size: 16px; min-height: 56px; }
+}
+
+@media (max-height: 700px) {
+  .menu-emblem { width: 100px; height: 100px; margin-bottom: 16px; }
+  .subtitle { margin-bottom: 16px; }
+  .menu-stats { margin: 16px 0 24px; }
+  .menu-actions { gap: 8px; }
+}
