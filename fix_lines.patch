@@ -1,0 +1,45 @@
+<<<<<<< SEARCH
+    // Линии маршрута
+    ctx.strokeStyle = 'rgba(212,168,75,0.4)';
+    ctx.setLineDash([5, 5]);
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    let first = true;
+    for(let i=0; i<proj.length; i++) {
+        const p = proj.find(pt => pt.i === i);
+        if(!p) continue;
+        if(p.pz < -0.2) continue; // Не рисуем линию на задней стороне сферы
+        if(first) { ctx.moveTo(p.px, p.py); first = false; }
+        else { ctx.lineTo(p.px, p.py); }
+    }
+    ctx.stroke();
+    ctx.setLineDash([]);
+=======
+    // Линии маршрута
+    ctx.strokeStyle = 'rgba(212,168,75,0.4)';
+    ctx.setLineDash([5, 5]);
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    let first = true;
+    let lastZVisible = false;
+    for(let i=0; i<proj.length; i++) {
+        const p = proj.find(pt => pt.i === i);
+        if(!p) continue;
+        const isVisible = p.pz >= -0.2;
+        if (!isVisible) {
+            first = true; // Разрыв линии, если ушли за горизонт
+            lastZVisible = false;
+            continue;
+        }
+        if(first) {
+            ctx.moveTo(p.px, p.py);
+            first = false;
+        } else {
+            if(lastZVisible) ctx.lineTo(p.px, p.py);
+            else ctx.moveTo(p.px, p.py);
+        }
+        lastZVisible = true;
+    }
+    ctx.stroke();
+    ctx.setLineDash([]);
+>>>>>>> REPLACE

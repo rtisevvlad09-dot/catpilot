@@ -11,6 +11,9 @@
   let canvas, ctx;
   let W = 0, H = 0;
 
+  // Event handler references for cleanup
+  let onMouseUp, onTouchEnd, onResize;
+
   // Вращение глобуса
   let rotX = 0;      // вокруг оси X (вверх-вниз)
   let rotY = 0;      // вокруг оси Y (влево-вправо)
@@ -23,28 +26,86 @@
   const RADIUS = 180; // Базовый радиус
   const POINTS_COUNT = 80;
   let levels = [];
+  let landmasses = [];
 
-  // Генерация точек на сфере (спираль Фибоначчи для равномерного распределения)
+  // Географические маркеры (Широта, Долгота)
+  const CITIES = [
+    { name: 'Лондонъ', lat: 0.9, lon: 0.0 }, // 51N, 0
+    { name: 'Парижъ', lat: 0.85, lon: 0.04 }, // 48N, 2E
+    { name: 'Альпы', lat: 0.8, lon: 0.17 }, // 46N, 10E
+    { name: 'Суэцъ', lat: 0.52, lon: 0.56 }, // 30N, 32E
+    { name: 'Индія', lat: 0.35, lon: 1.35 }, // 20N, 77E
+    { name: 'Китай', lat: 0.6, lon: 1.8 }, // 35N, 104E
+    { name: 'Японія', lat: 0.63, lon: 2.4 }, // 36N, 138E
+    { name: 'Тихій океанъ', lat: 0.1, lon: 3.5 }, // 5N, -160 (200E)
+    { name: 'Сан-Франциско', lat: 0.66, lon: 4.15 }, // 37N, -122 (238E)
+    { name: 'Нью-Йоркъ', lat: 0.71, lon: 5.0 }, // 40N, -74 (286E)
+    { name: 'Атлантика', lat: 0.6, lon: 5.6 } // 35N, -35 (325E)
+  ];
+
+  function llToXYZ(lat, lon) {
+    return {
+      x: Math.cos(lat) * Math.cos(lon),
+      y: Math.sin(lat),
+      z: Math.cos(lat) * Math.sin(lon)
+    };
+  }
+
+  function initContinents() {
+    landmasses = [];
+    const rnd = () => Math.random() * 2 - 1;
+    // Очень грубая аппроксимация континентов кругами
+    const regions = [
+      { lat: 0.8, lon: 0.2, r: 0.3, c: 40 }, // Европа
+      { lat: 0.5, lon: 1.5, r: 0.6, c: 80 }, // Азия
+      { lat: -0.1, lon: 0.4, r: 0.5, c: 70 }, // Африка
+      { lat: 0.8, lon: 4.6, r: 0.5, c: 60 }, // Сев. Америка
+      { lat: -0.3, lon: 5.1, r: 0.4, c: 50 }, // Юж. Америка
+      { lat: -0.4, lon: 2.3, r: 0.3, c: 30 } // Австралия
+    ];
+
+    for (let reg of regions) {
+      for (let i=0; i<reg.c; i++) {
+        // Разброс вокруг центра региона
+        const dLat = (Math.random() - 0.5) * reg.r;
+        const dLon = (Math.random() - 0.5) * reg.r * 1.5;
+        const pLat = reg.lat + dLat;
+        const pLon = reg.lon + dLon;
+        // Отсечение по краям
+        if (pLat > 1.4 || pLat < -1.4) continue;
+        landmasses.push(llToXYZ(pLat, pLon));
+      }
+    }
+  }
+
   function initLevels() {
     levels = [];
     const done = window.Save?.data?.done || [];
 
-    // Экватор наклонен
+    // Генерируем маршрут, проходящий через города
     for (let i = 0; i < POINTS_COUNT; i++) {
       const isBoss = (i % 4 === 3);
-      // Располагаем точки примерно по экватору/спирали с легким шумом
-      const t_val = i / (POINTS_COUNT - 1); // 0 to 1
 
-      // Маршрут: оборот вокруг Земли
-      // Долгота: от 0 до 2*PI (или чуть больше, чтобы сделать петли)
-      const lon = t_val * Math.PI * 2.5 - Math.PI;
-      // Широта: колебания экватора
-      const lat = Math.sin(t_val * Math.PI * 4) * 0.4 + (Math.random()*0.1 - 0.05);
+      const progress = i / (POINTS_COUNT - 1); // 0 to 1
 
-      // Сферические в декартовы координаты (радиус 1)
-      const x = Math.cos(lat) * Math.cos(lon);
-      const y = Math.sin(lat);
-      const z = Math.cos(lat) * Math.sin(lon);
+      // Находим два ближайших города
+      const cityIdxFloat = progress * (CITIES.length - 1);
+      const idx1 = Math.floor(cityIdxFloat);
+      const idx2 = Math.min(CITIES.length - 1, idx1 + 1);
+      const t = cityIdxFloat - idx1;
+
+      const c1 = CITIES[idx1];
+      const c2 = CITIES[idx2];
+
+      // Интерполяция
+      let lat = c1.lat + (c2.lat - c1.lat) * t;
+      let lon = c1.lon + (c2.lon - c1.lon) * t;
+
+      // Добавляем шум, чтобы не было прямой линии
+      lat += (Math.random() * 0.1 - 0.05);
+      lon += (Math.random() * 0.1 - 0.05);
+
+      const xyz = llToXYZ(lat, lon);
 
       const isCompleted = done.includes(i);
       const isAvailable = (i === 0 || done.includes(i-1));
@@ -53,8 +114,18 @@
       if (isCompleted) state = 'done';
       else if (isAvailable) state = 'avail';
 
-      levels.push({ i, x, y, z, isBoss, state });
+      // Привязываем названия городов к некоторым узлам
+      let cityName = null;
+      if (Math.abs(t) < 0.1 && i !== 0 && i !== POINTS_COUNT - 1) { // Близко к c1
+         cityName = c1.name;
+      }
+
+      levels.push({ i, x: xyz.x, y: xyz.y, z: xyz.z, isBoss, state, cityName });
     }
+
+    // Гарантируем, что старт и финиш называются
+    if(levels.length > 0) levels[0].cityName = CITIES[0].name;
+    if(levels.length > 0) levels[levels.length-1].cityName = CITIES[CITIES.length-1].name;
   }
 
   // 3D вращение точки
@@ -107,6 +178,21 @@
     ctx.fillStyle = hg;
     ctx.fill();
 
+    // Континенты
+    ctx.fillStyle = 'rgba(40, 80, 50, 0.4)'; // Зеленоватый оттенок суши
+    for (let p of landmasses) {
+      const pRot = rotate3D(p, rotX, rotY);
+      if (pRot.z < 0) continue; // На обратной стороне
+      const px = cx + pRot.x * R;
+      const py = cy + pRot.y * R;
+      // Размер пятна зависит от перспективы
+      const scale = 0.5 + (pRot.z + 1) * 0.5;
+
+      ctx.beginPath();
+      ctx.arc(px, py, 15 * scale, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
     // Меридианы и параллели (каркас)
     ctx.strokeStyle = 'rgba(255,255,255,0.05)';
     ctx.lineWidth = 1;
@@ -132,12 +218,24 @@
     ctx.lineWidth = 2;
     ctx.beginPath();
     let first = true;
+    let lastZVisible = false;
     for(let i=0; i<proj.length; i++) {
         const p = proj.find(pt => pt.i === i);
         if(!p) continue;
-        if(p.pz < -0.2) continue; // Не рисуем линию на задней стороне сферы
-        if(first) { ctx.moveTo(p.px, p.py); first = false; }
-        else { ctx.lineTo(p.px, p.py); }
+        const isVisible = p.pz >= -0.2;
+        if (!isVisible) {
+            first = true; // Разрыв линии, если ушли за горизонт
+            lastZVisible = false;
+            continue;
+        }
+        if(first) {
+            ctx.moveTo(p.px, p.py);
+            first = false;
+        } else {
+            if(lastZVisible) ctx.lineTo(p.px, p.py);
+            else ctx.moveTo(p.px, p.py);
+        }
+        lastZVisible = true;
     }
     ctx.stroke();
     ctx.setLineDash([]);
@@ -182,6 +280,15 @@
          ctx.textBaseline = 'bottom';
          ctx.fillStyle = '#fff';
          ctx.fillText('✈', p.px, p.py - size - 2);
+      }
+
+      // Название города
+      if (p.cityName && scale > 0.8) {
+         ctx.font = `${Math.floor(10 * scale)}px 'IM Fell English SC', serif`;
+         ctx.textAlign = 'center';
+         ctx.textBaseline = 'top';
+         ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+         ctx.fillText(p.cityName, p.px, p.py + size + 4);
       }
     }
   }
@@ -235,6 +342,10 @@
     canvas = document.getElementById('globeCanvas');
     ctx = canvas.getContext('2d');
 
+    onMouseUp = () => { if (canvas) { isDragging = false; canvas.style.cursor='grab'; } };
+    onTouchEnd = () => { isDragging = false; };
+    onResize = () => resize();
+
     // События мыши/тача для вращения
     canvas.addEventListener('mousedown', e => { isDragging = true; lastMouse = {x: e.clientX, y: e.clientY}; canvas.style.cursor='grabbing'; });
     canvas.addEventListener('mousemove', e => {
@@ -245,7 +356,7 @@
       vRotX = dy * 0.005;
       lastMouse = {x: e.clientX, y: e.clientY};
     });
-    window.addEventListener('mouseup', () => { isDragging = false; canvas.style.cursor='grab'; });
+    window.addEventListener('mouseup', onMouseUp);
 
     canvas.addEventListener('touchstart', e => { isDragging = true; lastMouse = {x: e.touches[0].clientX, y: e.touches[0].clientY}; });
     canvas.addEventListener('touchmove', e => {
@@ -256,25 +367,32 @@
       vRotX = dy * 0.005;
       lastMouse = {x: e.touches[0].clientX, y: e.touches[0].clientY};
     });
-    window.addEventListener('touchend', () => { isDragging = false; });
+    window.addEventListener('touchend', onTouchEnd);
 
-    document.getElementById('btnMapBack').onclick = () => {
+    function cleanup() {
       running = false;
       cancelAnimationFrame(raf);
+      window.removeEventListener('mouseup', onMouseUp);
+      window.removeEventListener('touchend', onTouchEnd);
+      window.removeEventListener('resize', onResize);
+    }
+
+    document.getElementById('btnMapBack').onclick = () => {
+      cleanup();
       if(window.Screens?.show) window.Screens.show('menu');
     };
 
     document.getElementById('btnFlyGlobal').onclick = () => {
        const done = window.Save?.data?.done || [];
        let next = 0; while (next < 80 && done.includes(next)) next++;
-       running = false;
-       cancelAnimationFrame(raf);
+       cleanup();
        if (window.Briefing?.show) window.Briefing.show(next, () => { if (window.Flight?.start) window.Flight.start(next); });
        else if (window.Flight?.start) window.Flight.start(next);
     };
 
-    window.addEventListener('resize', resize);
+    window.addEventListener('resize', onResize);
     resize();
+    initContinents();
     initLevels();
 
     running = true;
