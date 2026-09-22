@@ -5,7 +5,7 @@ const log=(...a)=>{if(window.Logger?.module)window.Logger.module('Flight',...a);
 const t=(k,p)=>window.I18n?window.I18n.t(k,p):k;
 let canvas,ctx,W=0,H=0,running=false,paused=false,raf=0,lastT=0;
 let levelIndex=0,level=null,M=null,SCROLL=100;
-let player,bullets,ebullets,enemies,coins,fuels,cloudsB,cloudsM,cloudsF,boss,exhaust;
+let player,bullets,ebullets,enemies,coins,fuels,cloudsB,cloudsM,cloudsF,boss,exhaust,birds=[],airships=[],flaks=[];
 let dist,goal,rival,coinsGot,time,spawnT,coinT,fuelT,propT;
 let curDB={list:[],speed:1,ctrl:1,vis:0,burn:0,gust:0},lastChips='';
 let input={up:false,down:false,left:false,right:false,fire:false},pointer={active:false,x:0,y:0},listenersOn=false;
@@ -108,7 +108,7 @@ function start(i){
   const startHp=Math.max(30,window.Save?.data?.engine||100);
   const fuelPct=(window.Save?.data?.fuel??100);
   player={x:W*0.25,y:H/2,vy:0,hp:Math.min(startHp,M.maxhp),fuel:M.fuelmax*fuelPct/100,fireCd:0,tilt:0,bob:0};
-  bullets=[];ebullets=[];enemies=[];coins=[];fuels=[];exhaust=[];boss=null;lastChips='';
+  bullets=[];ebullets=[];enemies=[];coins=[];fuels=[];exhaust=[];birds=[];airships=[];flaks=[];boss=null;lastChips='';
   curDB={list:[],speed:1,ctrl:1,vis:0,burn:0,gust:0};
   dist=0;goal=level.boss?1e9:level.dist*100;rival=0;coinsGot=0;time=0;spawnT=2;coinT=1.2;fuelT=7;propT=0;
   const mk=(n,d)=>Array.from({length:n},()=>({x:Math.random()*W,y:Math.random()*H*0.55,d:d*(0.7+Math.random()*0.6),r:20+Math.random()*40}));
@@ -206,7 +206,30 @@ function upd(dt){
     window.Sound?.shoot?.();}}
   if(fxOn())exhaust.push({x:player.x-28,y:player.y+2,a:0.5,r:3});
   for(let p of exhaust){p.x-=SCROLL*1.2*dt;p.a-=dt*1.2;p.r+=dt*8;}exhaust=exhaust.filter(p=>p.a>0);
-  spawnT-=dt;if(spawnT<=0&&!level.boss){spawnT=(level.t==='combat'?1.4:2.8)-Math.min(1.2,levelIndex*0.03);enemies.push({x:W+40,y:60+Math.random()*(H-160),vx:-(80+Math.random()*50),ph:Math.random()*6,shoot:Math.random()<0.35});}
+  spawnT-=dt;if(spawnT<=0&&!level.boss){
+    spawnT=(level.t==='combat'?1.4:2.8)-Math.min(1.2,levelIndex*0.03);
+    enemies.push({x:W+40,y:60+Math.random()*(H-160),vx:-(80+Math.random()*50),ph:Math.random()*6,shoot:Math.random()<0.35});
+
+    // Spawn Marketing Impressions Obstacles based on level config
+    if(level.obs && level.obs.length > 0) {
+      const ob = level.obs[Math.floor(Math.random() * level.obs.length)];
+      const yy = 60 + Math.random()*(H-160);
+      if(ob === 'birds') {
+         // Spawn a flock of fast, fragile birds
+         const v = 150 + Math.random()*50;
+         birds.push({x: W+40, y: yy, vx: -v, ph: Math.random()*10, hp: 10, dead: false});
+         birds.push({x: W+60, y: yy-20, vx: -v, ph: Math.random()*10, hp: 10, dead: false});
+         birds.push({x: W+60, y: yy+20, vx: -v, ph: Math.random()*10, hp: 10, dead: false});
+      } else if(ob === 'airship') {
+         // Tanky slow airship
+         airships.push({x: W+100, y: yy, vx: -40, hp: 150, dead: false});
+      } else if(ob === 'flak') {
+         // Ground-based anti-air, telegraphs an area, then explodes
+         flaks.push({x: player.x + 200 + Math.random()*150, y: player.y + (Math.random()*100-50), timer: 2.0, state: 'warn'});
+      }
+    }
+  }
+
   coinT-=dt;if(coinT<=0){coinT=1.6;const cy=60+Math.random()*(H-160);for(let k=0;k<4;k++)coins.push({x:W+40+k*30,y:cy,ph:k});}
   fuelT-=dt;if(fuelT<=0){fuelT=9;fuels.push({x:W+40,y:60+Math.random()*(H-160)});}
   for(let b of bullets)b.x+=b.vx*dt;bullets=bullets.filter(b=>b.x<W+50);
@@ -214,6 +237,20 @@ function upd(dt){
   const isHidden=window.Powerups?.isStealth?.();
   for(let e of enemies){e.x+=e.vx*dt*tScale-SCROLL*0.3*dt;e.y+=Math.sin(time*2+e.ph)*25*dt*tScale;if(e.shoot&&!isHidden&&Math.random()<dt*0.6*tScale)ebullets.push({x:e.x-20,y:e.y,vx:-240*tScale,vy:0});}
   enemies=enemies.filter(e=>e.x>-60&&!e.dead);
+  for(let b of birds) { b.x += b.vx*dt*tScale - SCROLL*0.3*dt; b.y += Math.sin(time*5+b.ph)*15*dt*tScale; }
+  birds = birds.filter(b => b.x > -60 && !b.dead);
+
+  for(let a of airships) { a.x += a.vx*dt*tScale - SCROLL*0.3*dt; }
+  airships = airships.filter(a => a.x > -150 && !a.dead);
+
+  for(let f of flaks) {
+    f.x -= SCROLL*0.5*dt;
+    f.timer -= dt;
+    if(f.state === 'warn' && f.timer <= 0) { f.state = 'boom'; f.timer = 0.5; window.Sound?.hit?.(); }
+    if(f.state === 'boom' && f.timer <= 0) { f.dead = true; }
+  }
+  flaks = flaks.filter(f => !f.dead);
+
   for(let b of ebullets){b.x+=b.vx*dt*tScale;b.y+=(b.vy||0)*dt*tScale;}ebullets=ebullets.filter(b=>b.x>-50&&b.y>-50&&b.y<H+50);
   const mr=window.Powerups?.magnetRadius?.()||0;
   if(mr>0){for(let c of coins){const dx=player.x-c.x,dy=player.y-c.y,d=Math.hypot(dx,dy);if(d<mr&&d>1){c.x+=dx/d*300*dt;c.y+=dy/d*300*dt;}}for(let fu of fuels){const dx=player.x-fu.x,dy=player.y-fu.y,d=Math.hypot(dx,dy);if(d<mr&&d>1){fu.x+=dx/d*300*dt;fu.y+=dy/d*300*dt;}}}
@@ -224,8 +261,15 @@ function upd(dt){
   const pr=22;const cMul=window.Powerups?.coinMul?.()||1;
   for(let b of bullets){const bDmg=b.mega?M.dmg*2.5:M.dmg;const bRad=b.mega?36:26;
     for(let e of enemies){if(!e.dead&&Math.hypot(b.x-e.x,b.y-e.y)<bRad){e.dead=true;b.x=1e9;coinsGot+=2*cMul;window.Sound?.coin?.();}}
+    for(let bi of birds) { if(!bi.dead && Math.hypot(b.x-bi.x, b.y-bi.y) < bRad - 10) { bi.hp -= bDmg; if(bi.hp<=0) { bi.dead=true; coinsGot += Math.floor(1*cMul); window.Sound?.coin?.(); } b.x=1e9; } }
+    for(let a of airships) { if(!a.dead && Math.hypot(b.x-a.x, b.y-a.y) < bRad + 20) { a.hp -= bDmg; if(a.hp<=0) { a.dead=true; coinsGot += Math.floor(5*cMul); window.Sound?.coin?.(); } b.x=1e9; } }
+
     if(boss&&Math.hypot(b.x-boss.x,b.y-boss.y)<(b.mega?56:46)){boss.hp-=bDmg;b.x=1e9;}}
   for(let e of enemies){if(!e.dead&&Math.hypot(e.x-player.x,e.y-player.y)<pr+22){e.dead=true;hit(25);}}
+  for(let bi of birds) { if(!bi.dead && Math.hypot(bi.x-player.x, bi.y-player.y) < pr+12) { bi.dead=true; hit(15); } }
+  for(let a of airships) { if(!a.dead && Math.hypot(a.x-player.x, a.y-player.y) < pr+40) { a.dead=true; hit(30); } }
+  for(let f of flaks) { if(f.state === 'boom' && Math.hypot(f.x-player.x, f.y-player.y) < pr+60) { hit(5 * dt * 60); } }
+
   for(let b of ebullets){if(Math.hypot(b.x-player.x,b.y-player.y)<pr){b.x=-1e9;hit(10);}}
   for(let c of coins){if(Math.hypot(c.x-player.x,c.y-player.y)<pr+12){c.got=true;coinsGot+=cMul;window.Sound?.coin?.();}}
   for(let fu of fuels){if(Math.hypot(fu.x-player.x,fu.y-player.y)<pr+14){fu.got=true;player.fuel=Math.min(M.fuelmax,player.fuel+25);}}
@@ -262,6 +306,67 @@ function draw(){
   for(let b of ebullets){ctx.fillStyle='rgba(255,90,70,.95)';ctx.beginPath();ctx.arc(b.x,b.y,4,0,7);ctx.fill();}
   if(window.Powerups?.draw)window.Powerups.draw(ctx,time);
   for(let e of enemies){drawShadow(e.x,e.y,1);drawPlane(e.x,e.y,'#5a5a6a',-1,1,0);}
+  // --- New Obstacle Draw Logic ---
+  for(let b of birds) {
+    ctx.strokeStyle = '#222';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(b.x + 8, b.y - 4);
+    ctx.quadraticCurveTo(b.x, b.y - 8, b.x - 8, b.y);
+    ctx.moveTo(b.x + 8, b.y + 4);
+    ctx.quadraticCurveTo(b.x, b.y + 8, b.x - 8, b.y);
+    ctx.stroke();
+  }
+
+  for(let a of airships) {
+    drawShadow(a.x, a.y + 40, 1.5);
+    // Envelope
+    ctx.fillStyle = '#cfd3cd';
+    ctx.strokeStyle = '#5c636a';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.ellipse(a.x, a.y, 60, 25, 0, 0, Math.PI*2);
+    ctx.fill();
+    ctx.stroke();
+    // Gondola
+    ctx.fillStyle = '#6e5c47';
+    ctx.fillRect(a.x - 15, a.y + 25, 30, 10);
+    // Tail fins
+    ctx.fillStyle = '#852b2b';
+    ctx.beginPath();
+    ctx.moveTo(a.x + 50, a.y);
+    ctx.lineTo(a.x + 70, a.y - 15);
+    ctx.lineTo(a.x + 70, a.y + 15);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+  }
+
+  for(let f of flaks) {
+    if(f.state === 'warn') {
+       // Telegraph crosshair
+       ctx.strokeStyle = `rgba(255, 60, 40, ${0.5 + 0.5 * Math.sin(time*15)})`;
+       ctx.lineWidth = 2;
+       ctx.beginPath();
+       ctx.arc(f.x, f.y, 40, 0, Math.PI*2);
+       ctx.moveTo(f.x - 50, f.y); ctx.lineTo(f.x + 50, f.y);
+       ctx.moveTo(f.x, f.y - 50); ctx.lineTo(f.x, f.y + 50);
+       ctx.stroke();
+    } else if(f.state === 'boom') {
+       // Explosion
+       const progress = 1 - (f.timer / 0.5); // 0 to 1
+       ctx.fillStyle = `rgba(40, 40, 40, ${1 - progress})`;
+       ctx.beginPath();
+       ctx.arc(f.x, f.y, 60 * progress, 0, Math.PI*2);
+       ctx.fill();
+       ctx.fillStyle = `rgba(255, 120, 40, ${1 - progress})`;
+       ctx.beginPath();
+       ctx.arc(f.x, f.y, 40 * progress, 0, Math.PI*2);
+       ctx.fill();
+    }
+  }
+  // -------------------------------
+
   if(boss){
     if(boss.type==='sniper'&&boss.telegraph>0){ctx.strokeStyle=`rgba(255,60,40,${0.4+0.4*Math.sin(time*20)})`;ctx.lineWidth=2;ctx.setLineDash([8,6]);ctx.beginPath();ctx.moveTo(boss.x-40,boss.y);ctx.lineTo(0,boss.y);ctx.stroke();ctx.setLineDash([]);}
     drawShadow(boss.x,boss.y,1.8);

@@ -14,19 +14,44 @@
     'Старшина Гроза','Графъ Рикошетъ','Мадамъ Миражъ','Генералъ Тайфунъ','Императоръ Пустоты'
   ];
 
+  // ═══ МАРШРУТЫ И ПРЕПЯТСТВИЯ ═══
+  const ROUTES = [
+    { from: 'Лондонъ', to: 'Парижъ', w: ['CLEAR', 'CLOUDY'], obs: ['birds', 'airship'] },
+    { from: 'Парижъ', to: 'Альпы', w: ['CLOUDY', 'WIND'], obs: ['flak', 'birds'] },
+    { from: 'Альпы', to: 'Суэцъ', w: ['SNOW', 'BLIZZARD', 'CLEAR'], obs: ['flak'] },
+    { from: 'Суэцъ', to: 'Индія', w: ['CLEAR', 'FOG'], obs: ['airship'] },
+    { from: 'Индія', to: 'Китай', w: ['RAIN', 'STORM'], obs: ['birds', 'flak'] },
+    { from: 'Китай', to: 'Японія', w: ['CLOUDY', 'WIND'], obs: ['birds'] },
+    { from: 'Японія', to: 'Тихій океанъ', w: ['CLEAR', 'FOG'], obs: ['airship', 'flak'] },
+    { from: 'Тихій океанъ', to: 'Сан-Франциско', w: ['STORM', 'NIGHT'], obs: ['flak'] },
+    { from: 'Сан-Франциско', to: 'Нью-Йоркъ', w: ['CLEAR', 'WIND'], obs: ['birds', 'airship'] },
+    { from: 'Нью-Йоркъ', to: 'Атлантика', w: ['CLOUDY', 'NIGHT'], obs: ['airship', 'flak'] },
+    { from: 'Атлантика', to: 'Лондонъ', w: ['STORM', 'BLIZZARD', 'FOG'], obs: ['birds', 'airship', 'flak'] }
+  ];
+
   const L = [];
   let b = 0;
   for (let i = 0; i < 80; i++) {
     const isBoss = (i % 4 === 3);
+    const progress = i / 79;
+
+    // Determine current route segment based on progress
+    const routeIdxFloat = progress * (ROUTES.length);
+    const rIdx = Math.min(ROUTES.length - 1, Math.floor(routeIdxFloat));
+    const route = ROUTES[rIdx];
+
     const lv = {
-      n: isBoss ? ('Дуэль: ' + BOSS_NAMES[b]) : (ACT[i % ACT.length] + ' ' + PLACE[(i * 3) % PLACE.length]),
+      n: isBoss ? ('Дуэль: ' + BOSS_NAMES[b]) : (ACT[i % ACT.length] + ' (' + route.from + ' ➔ ' + route.to + ')'),
       y: 1909 + Math.floor(i * 18 / 79),
       t: isBoss ? 'duel' : TYPES[i % TYPES.length],
-      w: i === 0 ? 'CLEAR' : WEATHER[(i * 5) % WEATHER.length],
+      w: route.w[i % route.w.length],
       dist: 8 + (i % 4) * 3 + (isBoss ? 4 : 0),
+      obs: isBoss ? [] : route.obs,
       _idx: i,
       _isBoss: isBoss,
-      _bossIdx: isBoss ? b : -1
+      _bossIdx: isBoss ? b : -1,
+      _routeFrom: route.from,
+      _routeTo: route.to
     };
     if (isBoss) { lv.boss = BOSS_NAMES[b]; b++; }
     L.push(lv);
