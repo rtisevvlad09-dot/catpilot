@@ -12,11 +12,10 @@ const LANGS={
 
 const T={
   // ── Меню ──
-  gameTitle:{ru:'Котъ-Лётчикъ',en:'Cat Pilot',tr:'Kedi Pilot',zh:'猫飞行员'},
-  empireName:{ru:'ИМПЕРІЯ КОТОВЪ',en:'CAT EMPIRE',tr:'KEDİ İMPARATORLUĞU',zh:'猫帝国'},
-  subtitle:{ru:'Крылья Имперіи',en:'Wings of Empire',tr:'İmparatorluğun Kanatları',zh:'帝国之翼'},
-  subtitle:{ru:'Крылья Имперіи',en:'Wings of Empire',tr:'İmparatorluğun Kanatları',zh:'帝国之翼'},
-  motto:{ru:'«Честь и Небо — наше наслѣдіе»',en:'"Honor and Sky — our heritage"',tr:'"Onur ve Gökyüzü — mirasımız"',zh:'「荣誉与天空——我们的遗产」'},
+  gameTitle:{ru:'Котъ-Лётчикъ 2',en:'Cat Pilot 2',tr:'Kedi Pilot 2',zh:'猫飞行员 2'},
+  empireName:{ru:'КРУГОСВѢТНЫЙ ПОЛЁТЪ',en:'AROUND THE WORLD',tr:'DÜNYA TURU',zh:'环游世界'},
+  subtitle:{ru:'Вокругъ свѣта за 80 дней',en:'Around the World in 80 Days',tr:'80 Günde Devriâlem',zh:'80天环游世界'},
+  motto:{ru:'«Пари на балу у Императора: облетѣть міръ за 80 дней!»',en:'"A bet at the Emperor\'s ball: round the world in 80 days!"',tr:'"İmparatorluk balosunda bahis: 80 günde devriâlem!"',zh:'「皇帝舞会上的赌注：80天环游世界！」'},
   play:{ru:'✈ Въ полётъ',en:'✈ Fly',tr:'✈ Uç',zh:'✈ 起飞'},
   livesOut:{ru:'💔 Жизни кончились',en:'💔 No lives left',tr:'💔 Can kalmadı',zh:'💔 没有生命了'},
   livesBtn:{ru:'❤️ Жизни пилота',en:'❤️ Pilot lives',tr:'❤️ Pilot canları',zh:'❤️ 飞行员生命'},

@@ -137,15 +137,14 @@
       const {SD,d}=getData();
       const tabs=[
         {id:'up', label:t('upgrades')},
-        {id:'planes', label:t('planes')},
         {id:'boosts', label:t('boosters')},
         {id:'gold', label:t('gold')}
       ];
       let content='';
       if(activeTab==='up') content=UPG.map(u=>upCard(u,d)).join('');
-      else if(activeTab==='planes') content=(window.PLANES||[]).map(p=>planeCard(p,d)).join('');
       else if(activeTab==='boosts') content=(SD.BOOSTS||[]).map(b=>boostCard(b,d)).join('');
-      else content=(SD.GOLD||[]).map(g=>goldCard(g)).join('');
+      else if(activeTab==='gold') content=(SD.GOLD||[]).map(g=>goldCard(g)).join('');
+      else content='';
 
       app.innerHTML=`
         <style>

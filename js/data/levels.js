@@ -1,4 +1,4 @@
-// ═══ 60 УРОВНЕЙ · 20 БОССОВЪ (каждый 3-й) ═══
+// ═══ 80 УРОВНЕЙ · 20 БОССОВЪ (каждый 4-й) ═══
 (function() {
   'use strict';
   const log = (...a) => { if (window.Logger?.module) window.Logger.module('Levels', ...a); };
@@ -6,7 +6,7 @@
   const TYPES = ['delivery','race','duel','survival','combat','stealth','rescue'];
   const WEATHER = ['CLEAR','CLOUDY','RAIN','STORM','SNOW','BLIZZARD','WIND','NIGHT','FOG'];
   const ACT = ['Депеша','Гонка','Развѣдка','Конвой','Патруль','Ночной дозоръ','Перехватъ','Дуэль'];
-  const PLACE = ['надъ Невой','къ Мяусквѣ','надъ Крымомъ','въ Карпатахъ','надъ Балтикой','къ Сибири','надъ Моремъ','къ Парижу'];
+  const PLACE = ['надъ Лондономъ','къ Парижу','надъ Альпами','къ Суэцу','въ Индіи','надъ Китаемъ','въ Японіи','надъ Тихимъ океаномъ','къ Сан-Франциско','къ Нью-Йорку','надъ Атлантикой'];
   const BOSS_NAMES = [
     'Графъ Обломовъ','Баронъ Штейнъ','Купецъ Брюхатый','Атаманъ Мурка','Князь Вихрь',
     'Поручикъ Рѣзвый','Полковникъ Громъ','Сѣрая Тѣнь','Адмиралъ Коготь','Ханъ Барсъ',
@@ -14,19 +14,44 @@
     'Старшина Гроза','Графъ Рикошетъ','Мадамъ Миражъ','Генералъ Тайфунъ','Императоръ Пустоты'
   ];
 
+  // ═══ МАРШРУТЫ И ПРЕПЯТСТВИЯ ═══
+  const ROUTES = [
+    { from: 'Лондонъ', to: 'Парижъ', w: ['CLEAR', 'CLOUDY'], obs: ['birds', 'airship'] },
+    { from: 'Парижъ', to: 'Альпы', w: ['CLOUDY', 'WIND'], obs: ['flak', 'birds'] },
+    { from: 'Альпы', to: 'Суэцъ', w: ['SNOW', 'BLIZZARD', 'CLEAR'], obs: ['flak'] },
+    { from: 'Суэцъ', to: 'Индія', w: ['CLEAR', 'FOG'], obs: ['airship'] },
+    { from: 'Индія', to: 'Китай', w: ['RAIN', 'STORM'], obs: ['birds', 'flak'] },
+    { from: 'Китай', to: 'Японія', w: ['CLOUDY', 'WIND'], obs: ['birds'] },
+    { from: 'Японія', to: 'Тихій океанъ', w: ['CLEAR', 'FOG'], obs: ['airship', 'flak'] },
+    { from: 'Тихій океанъ', to: 'Сан-Франциско', w: ['STORM', 'NIGHT'], obs: ['flak'] },
+    { from: 'Сан-Франциско', to: 'Нью-Йоркъ', w: ['CLEAR', 'WIND'], obs: ['birds', 'airship'] },
+    { from: 'Нью-Йоркъ', to: 'Атлантика', w: ['CLOUDY', 'NIGHT'], obs: ['airship', 'flak'] },
+    { from: 'Атлантика', to: 'Лондонъ', w: ['STORM', 'BLIZZARD', 'FOG'], obs: ['birds', 'airship', 'flak'] }
+  ];
+
   const L = [];
   let b = 0;
-  for (let i = 0; i < 60; i++) {
-    const isBoss = (i % 3 === 2);
+  for (let i = 0; i < 80; i++) {
+    const isBoss = (i % 4 === 3);
+    const progress = i / 79;
+
+    // Determine current route segment based on progress
+    const routeIdxFloat = progress * (ROUTES.length);
+    const rIdx = Math.min(ROUTES.length - 1, Math.floor(routeIdxFloat));
+    const route = ROUTES[rIdx];
+
     const lv = {
-      n: isBoss ? ('Дуэль: ' + BOSS_NAMES[b]) : (ACT[i % ACT.length] + ' ' + PLACE[(i * 3) % PLACE.length]),
-      y: 1909 + Math.floor(i * 18 / 59),
+      n: isBoss ? ('Дуэль: ' + BOSS_NAMES[b]) : (ACT[i % ACT.length] + ' (' + route.from + ' ➔ ' + route.to + ')'),
+      y: 1909 + Math.floor(i * 18 / 79),
       t: isBoss ? 'duel' : TYPES[i % TYPES.length],
-      w: i === 0 ? 'CLEAR' : WEATHER[(i * 5) % WEATHER.length],
+      w: route.w[i % route.w.length],
       dist: 8 + (i % 4) * 3 + (isBoss ? 4 : 0),
+      obs: isBoss ? [] : route.obs,
       _idx: i,
       _isBoss: isBoss,
-      _bossIdx: isBoss ? b : -1
+      _bossIdx: isBoss ? b : -1,
+      _routeFrom: route.from,
+      _routeTo: route.to
     };
     if (isBoss) { lv.boss = BOSS_NAMES[b]; b++; }
     L.push(lv);
@@ -48,14 +73,17 @@
   };
 
   const I18N_PLACE = {
-    'надъ Невой':       { en:'Over the Neva',     tr:'Neva Üzerinde',    zh:'涅瓦河上空' },
-    'къ Мяусквѣ':       { en:'To Mausqva',        tr:'Mausqva\'ya',      zh:'飞往猫斯科' },
-    'надъ Крымомъ':     { en:'Over Crimea',       tr:'Kırım Üzerinde',   zh:'克里米亚上空' },
-    'въ Карпатахъ':     { en:'In the Carpathians',tr:'Karpatlarda',      zh:'喀尔巴阡山' },
-    'надъ Балтикой':    { en:'Over the Baltic',   tr:'Baltık Üzerinde',  zh:'波罗的海上空' },
-    'къ Сибири':        { en:'To Siberia',        tr:'Sibirya\'ya',      zh:'飞往西伯利亚' },
-    'надъ Моремъ':      { en:'Over the Sea',      tr:'Deniz Üzerinde',   zh:'海洋上空' },
-    'къ Парижу':        { en:'To Paris',          tr:'Paris\'e',         zh:'飞往巴黎' }
+    'надъ Лондономъ':      { en:'Over London',          tr:'Londra Üzerinde',     zh:'伦敦上空' },
+    'къ Парижу':           { en:'To Paris',             tr:'Paris\'e',            zh:'飞往巴黎' },
+    'надъ Альпами':        { en:'Over the Alps',        tr:'Alpler Üzerinde',     zh:'阿尔卑斯山上空' },
+    'къ Суэцу':            { en:'To Suez',              tr:'Süveyş\'e',           zh:'飞往苏伊士' },
+    'въ Индіи':            { en:'In India',             tr:'Hindistan\'da',       zh:'在印度' },
+    'надъ Китаемъ':        { en:'Over China',           tr:'Çin Üzerinde',        zh:'中国上空' },
+    'въ Японіи':           { en:'In Japan',             tr:'Japonya\'da',         zh:'在日本' },
+    'надъ Тихимъ океаномъ':{ en:'Over the Pacific',     tr:'Pasifik Üzerinde',    zh:'太平洋上空' },
+    'къ Сан-Франциско':    { en:'To San Francisco',     tr:'San Francisco\'ya',   zh:'飞往旧金山' },
+    'къ Нью-Йорку':        { en:'To New York',          tr:'New York\'a',         zh:'飞往纽约' },
+    'надъ Атлантикой':     { en:'Over the Atlantic',    tr:'Atlantik Üzerinde',   zh:'大西洋上空' }
   };
 
   const I18N_BOSS = [
@@ -82,6 +110,8 @@
   ];
 
   const I18N_DUEL = { en:'Duel:', tr:'Düello:', zh:'决斗：' };
+
+  log('✓ Названія уровней локализованы (80 уровней + 20 боссовъ)');
 
   window.LEVELS.forEach(function(lv){
     const origName = lv.n;
@@ -122,5 +152,4 @@
     }
   });
 
-  log('✓ Названія уровней локализованы (60 уровней + 20 боссовъ)');
 })();

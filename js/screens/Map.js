@@ -1,360 +1,405 @@
 // ═══════════════════════════════════════════════════════════
-// 🗺️ КАРТА ИМПЕРІИ КОТОВЪ (Apple-style 1930-хъ пергаментъ) (i18n)
+// 🌍 КРУГОСВЕТНЫЙ ГЛОБУС (Псевдо-3D на Canvas)
 // ═══════════════════════════════════════════════════════════
 (function() {
   'use strict';
   const log = (...a) => { if (window.Logger?.module) window.Logger.module('Map', ...a); };
   const t = (k, p) => window.I18n ? window.I18n.t(k, p) : k;
+
+  let raf = null;
+  let running = false;
+  let canvas, ctx;
+  let W = 0, H = 0;
+
+  // Event handler references for cleanup
+  let onMouseUp, onTouchEnd, onResize;
+
+  // Вращение глобуса
+  let rotX = 0;      // вокруг оси X (вверх-вниз)
+  let rotY = 0;      // вокруг оси Y (влево-вправо)
+  let vRotX = 0, vRotY = 0.002;
+
+  let isDragging = false;
+  let lastMouse = { x: 0, y: 0 };
   
-  const INK = '#3d2b16';
-  const GOLD = '#b8860b';
-  const CREAM = '#f5e6c8';
-  const PARCHMENT = '#e8d5a8';
-  const MIN_SCALE = 1, MAX_SCALE = 5;
-  let scale = 1, tx = 0, ty = 0;
-  let world = null, viewport = null;
-  let seed = 1;
-  function rnd() { seed = (seed * 9301 + 49297) % 233280; return seed / 233280; }
+  // Геометрия
+  const RADIUS = 180; // Базовый радиус
+  const POINTS_COUNT = 80;
+  let levels = [];
+  let landmasses = [];
 
-  function genPoints(n) {
-    const pts = [], cols = 6, rows = Math.max(1, Math.ceil(n / cols));
-    for (let i = 0; i < n; i++) {
-      const row = Math.floor(i / cols), c = i % cols;
-      const col = (row % 2 === 0) ? c : (cols - 1 - c);
-      const x = 10 + col * (80 / (cols - 1)) + ((i * 7) % 3 - 1);
-      const y = Math.min(92, 10 + row * (80 / Math.max(1, rows - 1)));
-      pts.push([x, y]);
-    }
-    return pts;
-  }
-  const POINTS = genPoints((window.LEVELS || []).length || 60);
-
-  // Лорныя названія оставлены на русскомъ для атмосферы Имперіи
-  const PLACES = ['Муррбургъ','Мяусква','Мурское Село','Мяунева','Мурбалтика','Мяуполье','Мяуевъ','Когтымъ','Мурролѣсье','Котнигсбергъ','Когтепаты','Мурцкъ','Мяусибирь','Мурчёрное море','Котстантинополь','Мяуфоръ','Муррижъ','Мяльпы','Когтистыя горы'];
+  // Географические маркеры (Широта, Долгота)
   const CITIES = [
-    { x: 32, y: 14, name: 'Муррбургъ' }, { x: 41, y: 33, name: 'Мяусква' },
-    { x: 37, y: 50, name: 'Мяуевъ' },   { x: 44, y: 64, name: 'Когтымъ' },
-    { x: 78, y: 25, name: 'Мяусибирь' },{ x: 38, y: 90, name: 'Котстантинополь' },
-    { x: 7,  y: 57, name: 'Муррижъ' },  { x: 12, y: 71, name: 'Мяльпы' }
+    { name: 'Лондонъ', lat: 0.9, lon: 0.0 }, // 51N, 0
+    { name: 'Парижъ', lat: 0.85, lon: 0.04 }, // 48N, 2E
+    { name: 'Альпы', lat: 0.8, lon: 0.17 }, // 46N, 10E
+    { name: 'Суэцъ', lat: 0.52, lon: 0.56 }, // 30N, 32E
+    { name: 'Индія', lat: 0.35, lon: 1.35 }, // 20N, 77E
+    { name: 'Китай', lat: 0.6, lon: 1.8 }, // 35N, 104E
+    { name: 'Японія', lat: 0.63, lon: 2.4 }, // 36N, 138E
+    { name: 'Тихій океанъ', lat: 0.1, lon: 3.5 }, // 5N, -160 (200E)
+    { name: 'Сан-Франциско', lat: 0.66, lon: 4.15 }, // 37N, -122 (238E)
+    { name: 'Нью-Йоркъ', lat: 0.71, lon: 5.0 }, // 40N, -74 (286E)
+    { name: 'Атлантика', lat: 0.6, lon: 5.6 } // 35N, -35 (325E)
   ];
-  const SEAS = [ { x: 42, y: 79, name: 'МУРЧЁРНОЕ МОРЕ' }, { x: 22, y: 10, name: 'МУРБАЛТИКА' }, { x: 58, y: 58, name: 'КОТСПІЙСКОЕ МОРЕ' } ];
-  const REGIONS = [ { x: 40, y: 28, name: 'МАУСКОВІЯ' }, { x: 78, y: 16, name: 'СИБИРЬ' }, { x: 36, y: 45, name: 'МАЛАЯ ЗЕМЛЯ' }, { x: 8, y: 45, name: 'ИНОСТРАННЫЯ ЗЕМЛИ' }, { x: 33, y: 7, name: 'МУРЛЯНДІЯ' } ];
 
-  function isDone(i) { return (window.Save?.data?.done || []).includes(i); }
-  function isUnlocked(i) { return i === 0 || isDone(i - 1); }
-  function getStars(i) { return (window.Save?.data?.stars || {})[i] || 0; }
-
-  function apply(smooth) {
-    if (!world || !viewport) return;
-    const vw = viewport.clientWidth, vh = viewport.clientHeight;
-    world.style.transition = smooth ? 'left .35s ease, top .35s ease, width .35s ease, height .35s ease' : 'none';
-    world.style.left = tx + 'px'; world.style.top = ty + 'px';
-    world.style.width = (vw * scale) + 'px'; world.style.height = (vh * scale) + 'px';
-    world.style.setProperty('--lz', Math.min(2.5, 1 + (scale - 1) * 0.6));
-  }
-  function clamp() { if (!viewport) return; const vw = viewport.clientWidth, vh = viewport.clientHeight;
-    tx = Math.min(0, Math.max(vw - vw * scale, tx)); ty = Math.min(0, Math.max(vh - vh * scale, ty)); }
-  function setZoom(ns, cx, cy, smooth) { ns = Math.min(MAX_SCALE, Math.max(MIN_SCALE, ns)); const k = ns / scale;
-    tx = cx - k * (cx - tx); ty = cy - k * (cy - ty); scale = ns; clamp(); apply(smooth); }
-  function zoomToPercent(px, py, t) { if (!viewport) return; const vw = viewport.clientWidth, vh = viewport.clientHeight;
-    scale = Math.min(MAX_SCALE, Math.max(MIN_SCALE, t)); tx = vw/2 - scale*vw*px/100; ty = vh/2 - scale*vh*py/100; clamp(); apply(true); }
-  function resetZoom() { scale = 1; tx = 0; ty = 0; apply(true); }
-
-  function mountains(cx, cy, n, sx, sy) { let s=''; for(let i=0;i<n;i++){const x=cx+(rnd()*2-1)*sx,y=cy+(rnd()*2-1)*sy,r=1+rnd()*1.4;
-    s+=`<path d="M${x-r},${y} L${x},${y-r*1.7} L${x+r},${y}" fill="none" stroke="${INK}" stroke-width="0.35" opacity="0.7"/>`;} return s; }
-  function trees(cx, cy, n, sx, sy) { let s=''; for(let i=0;i<n;i++){const x=cx+(rnd()*2-1)*sx,y=cy+(rnd()*2-1)*sy;
-    s+=`<path d="M${x},${y-1.6} L${x-0.9},${y+0.8} L${x+0.9},${y+0.8} Z M${x},${y+0.8} L${x},${y+1.6}" fill="none" stroke="${INK}" stroke-width="0.3" opacity="0.6"/>`;} return s; }
-  function catSoldier(x, y, flip) { return `<g transform="translate(${x} ${y}) scale(${flip?-1:1},1)" stroke="${INK}" fill="none" stroke-width="0.5" opacity="0.75">
-      <circle cx="0" cy="-6" r="2.6"/><path d="M-2,-7.5 L-3,-10 L-1,-8.5 Z M2,-7.5 L3,-10 L1,-8.5 Z"/>
-      <path d="M0,-3.4 L0,3 M0,-1 L-3,1 M0,-1 L3,-2 M0,3 L-2,7 M0,3 L2,7"/><path d="M3,-2 L3,-9 M3,-9 L4.5,-7.5"/></g>`; }
-  function ship(x, y) { return `<g transform="translate(${x} ${y})" stroke="${INK}" fill="none" stroke-width="0.45" opacity="0.75">
-      <path d="M-4,1 Q0,3 4,1 L3,-1 L-3,-1 Z"/><path d="M0,-1 L0,-6 M0,-6 Q3,-4 0,-2"/></g>`; }
-  function biplane(x, y) { return `<g transform="translate(${x} ${y})" stroke="${GOLD}" fill="none" stroke-width="0.5" opacity="0.9">
-      <path d="M-5,0 L5,0 M-4,2 L4,2 M-4,0 L-4,2 M2,0 L2,2 M5,0 L7,1 M-5,0 Q-6,1 -5,2"/><circle cx="-6" cy="1" r="0.8"/></g>`; }
-
-  function compassRose(x, y, size) {
-    const s = size || 8;
-    const lang = window.I18n?.getLang?.() || 'ru';
-    const dirs = {
-      ru: {n:'С', s:'Ю', e:'В', w:'З'},
-      en: {n:'N', s:'S', e:'E', w:'W'},
-      tr: {n:'K', s:'G', e:'D', w:'B'},
-      zh: {n:'北', s:'南', e:'东', w:'西'}
+  function llToXYZ(lat, lon) {
+    return {
+      x: Math.cos(lat) * Math.cos(lon),
+      y: Math.sin(lat),
+      z: Math.cos(lat) * Math.sin(lon)
     };
-    const d = dirs[lang] || dirs.ru;
-    return `<g transform="translate(${x} ${y})" opacity="0.85">
-      <circle cx="0" cy="0" r="${s*1.3}" fill="none" stroke="${GOLD}" stroke-width="0.4"/>
-      <circle cx="0" cy="0" r="${s*1.1}" fill="none" stroke="${INK}" stroke-width="0.25"/>
-      <path d="M0,${-s} L${s*0.15},${-s*0.15} L0,0 L${-s*0.15},${-s*0.15} Z" fill="#8a2f1d" stroke="${INK}" stroke-width="0.2"/>
-      <path d="M0,${s} L${s*0.15},${s*0.15} L0,0 L${-s*0.15},${s*0.15} Z" fill="${CREAM}" stroke="${INK}" stroke-width="0.2"/>
-      <path d="M${s},0 L${s*0.15},${-s*0.15} L0,0 L${s*0.15},${s*0.15} Z" fill="${CREAM}" stroke="${INK}" stroke-width="0.2"/>
-      <path d="M${-s},0 L${-s*0.15},${-s*0.15} L0,0 L${-s*0.15},${s*0.15} Z" fill="${CREAM}" stroke="${INK}" stroke-width="0.2"/>
-      <text x="0" y="${-s-1.5}" text-anchor="middle" font-family="IM Fell English SC,serif" font-size="2.2" fill="${INK}">${d.n}</text>
-      <text x="0" y="${s+2.5}" text-anchor="middle" font-family="IM Fell English SC,serif" font-size="2.2" fill="${INK}">${d.s}</text>
-      <text x="${s+1.5}" y="0.8" text-anchor="middle" font-family="IM Fell English SC,serif" font-size="2.2" fill="${INK}">${d.e}</text>
-      <text x="${-s-1.5}" y="0.8" text-anchor="middle" font-family="IM Fell English SC,serif" font-size="2.2" fill="${INK}">${d.w}</text>
-      <circle cx="0" cy="0" r="0.8" fill="${GOLD}" stroke="${INK}" stroke-width="0.2"/>
-    </g>`;
   }
 
-  function renderLand() {
-    seed = 7;
-    return `
-      <svg viewBox="0 0 100 100" preserveAspectRatio="none" style="position:absolute;inset:0;width:100%;height:100%;">
-        <defs>
-          <filter id="rough"><feTurbulence type="fractalNoise" baseFrequency="0.02" numOctaves="3" seed="7" result="n"/><feDisplacementMap in="SourceGraphic" in2="n" scale="2.5"/></filter>
-          <linearGradient id="landFill" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="rgba(180,150,90,0.18)"/><stop offset="1" stop-color="rgba(140,110,60,0.12)"/></linearGradient>
-          <linearGradient id="seaFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="rgba(100,140,180,0.08)"/><stop offset="1" stop-color="rgba(80,120,160,0.14)"/></linearGradient>
-        </defs>
-        <rect width="100" height="100" fill="url(#seaFill)"/>
-        <path filter="url(#rough)" d="M28,5 C30,2 34,2 36,5 L38,10 C35,14 31,15 29,18 L28,24 C26,28 27,32 27,36 L26,46 C27,54 30,59 34,62 L40,64 L42,66 L43,70 L45,71 L47,68 L46,65 L49,67 C51,70 53,70 55,68 L60,72 C70,77 85,79 100,77 L100,3 C80,1 60,2 40,3 C36,3 30,3 28,5 Z" fill="url(#landFill)" stroke="${INK}" stroke-width="0.5"/>
-        <path filter="url(#rough)" d="M0,38 C5,32 11,34 14,38 C18,43 17,50 15,56 C13,63 8,68 3,70 L0,69 Z" fill="url(#landFill)" stroke="${INK}" stroke-width="0.4"/>
-        <path filter="url(#rough)" d="M20,8 C24,6 27,9 27,13 C27,18 24,21 21,21 C18,20 17,14 18,10 Z" fill="none" stroke="${GOLD}" stroke-width="0.35" stroke-dasharray="1.5 1" opacity="0.6"/>
-        <path filter="url(#rough)" d="M34,68 C38,65 45,66 49,69 C53,72 53,78 49,81 C44,84 38,83 35,79 C32,75 32,71 34,68 Z" fill="none" stroke="${GOLD}" stroke-width="0.35" stroke-dasharray="1.5 1" opacity="0.6"/>
-        <ellipse cx="58" cy="58" rx="3.5" ry="8" fill="none" stroke="${GOLD}" stroke-width="0.35" stroke-dasharray="1.5 1" opacity="0.5"/>
-        ${mountains(64, 30, 14, 2, 20)} ${mountains(13, 66, 10, 4, 4)} ${mountains(26, 61, 8, 3, 3)} ${mountains(51, 68, 6, 3, 2)}
-        ${trees(78, 30, 22, 14, 12)} ${trees(35, 40, 12, 6, 8)} ${trees(31, 22, 8, 4, 4)}
-        ${ship(42, 76)} ${ship(22, 13)} ${biplane(70, 12)} ${biplane(55, 8)}
-        ${catSoldier(94, 12, false)} ${catSoldier(94, 88, true)} ${catSoldier(5, 84, false)}
-        ${compassRose(90, 90, 5)}
-        ${CITIES.map(c => `<circle cx="${c.x}" cy="${c.y}" r="1" fill="${GOLD}" stroke="${INK}" stroke-width="0.3"/>`).join('')}
-        <polyline points="${POINTS.map(p => p[0]+','+p[1]).join(' ')}" fill="none" stroke="${GOLD}" stroke-width="1.4" stroke-dasharray="3 3" vector-effect="non-scaling-stroke" opacity="0.6"/>
-        <polyline points="${POINTS.map(p => p[0]+','+p[1]).join(' ')}" fill="none" stroke="${INK}" stroke-width="0.6" stroke-dasharray="3 3" vector-effect="non-scaling-stroke" opacity="0.4"/>
-      </svg>`;
+  function initContinents() {
+    landmasses = [];
+    const rnd = () => Math.random() * 2 - 1;
+    // Очень грубая аппроксимация континентов кругами
+    const regions = [
+      { lat: 0.8, lon: 0.2, r: 0.3, c: 40 }, // Европа
+      { lat: 0.5, lon: 1.5, r: 0.6, c: 80 }, // Азия
+      { lat: -0.1, lon: 0.4, r: 0.5, c: 70 }, // Африка
+      { lat: 0.8, lon: 4.6, r: 0.5, c: 60 }, // Сев. Америка
+      { lat: -0.3, lon: 5.1, r: 0.4, c: 50 }, // Юж. Америка
+      { lat: -0.4, lon: 2.3, r: 0.3, c: 30 } // Австралия
+    ];
+
+    for (let reg of regions) {
+      for (let i=0; i<reg.c; i++) {
+        // Разброс вокруг центра региона
+        const dLat = (Math.random() - 0.5) * reg.r;
+        const dLon = (Math.random() - 0.5) * reg.r * 1.5;
+        const pLat = reg.lat + dLat;
+        const pLon = reg.lon + dLon;
+        // Отсечение по краям
+        if (pLat > 1.4 || pLat < -1.4) continue;
+        landmasses.push(llToXYZ(pLat, pLon));
+      }
+    }
   }
 
-  function pointHTML(level, i) {
-    const p = POINTS[i] || [50,50];
-    const unlocked = isUnlocked(i), done = isDone(i), isBoss = !!level.boss;
-    const stars = getStars(i);
-    let cls = 'map-point', size = 32;
-    if (isBoss) { cls += ' boss'; size = 42; }
-    if (done) cls += ' done'; else if (unlocked) cls += ' available'; else cls += ' locked';
-    const starDots = done ? '<span class="star-dots">' + '★'.repeat(stars) + '☆'.repeat(3-stars) + '</span>' : '';
-    return `<button class="${cls}" data-level="${i}" style="left:${p[0]}%;top:${p[1]}%;width:${size}px;height:${size}px;margin-left:-${size/2}px;margin-top:-${size/2}px;">
-      ${isBoss ? '<span class="crown">♛</span>' : ''}
-      ${starDots}
-      <span class="num">${i + 1}</span>
-    </button>`;
+  function initLevels() {
+    levels = [];
+    const done = window.Save?.data?.done || [];
+
+    // Генерируем маршрут, проходящий через города
+    for (let i = 0; i < POINTS_COUNT; i++) {
+      const isBoss = (i % 4 === 3);
+
+      const progress = i / (POINTS_COUNT - 1); // 0 to 1
+
+      // Находим два ближайших города
+      const cityIdxFloat = progress * (CITIES.length - 1);
+      const idx1 = Math.floor(cityIdxFloat);
+      const idx2 = Math.min(CITIES.length - 1, idx1 + 1);
+      const t = cityIdxFloat - idx1;
+
+      const c1 = CITIES[idx1];
+      const c2 = CITIES[idx2];
+
+      // Интерполяция
+      let lat = c1.lat + (c2.lat - c1.lat) * t;
+      let lon = c1.lon + (c2.lon - c1.lon) * t;
+
+      // Добавляем шум, чтобы не было прямой линии
+      lat += (Math.random() * 0.1 - 0.05);
+      lon += (Math.random() * 0.1 - 0.05);
+
+      const xyz = llToXYZ(lat, lon);
+
+      const isCompleted = done.includes(i);
+      const isAvailable = (i === 0 || done.includes(i-1));
+
+      let state = 'locked';
+      if (isCompleted) state = 'done';
+      else if (isAvailable) state = 'avail';
+
+      // Привязываем названия городов к некоторым узлам
+      let cityName = null;
+      if (Math.abs(t) < 0.1 && i !== 0 && i !== POINTS_COUNT - 1) { // Близко к c1
+         cityName = c1.name;
+      }
+
+      levels.push({ i, x: xyz.x, y: xyz.y, z: xyz.z, isBoss, state, cityName });
+    }
+
+    // Гарантируем, что старт и финиш называются
+    if(levels.length > 0) levels[0].cityName = CITIES[0].name;
+    if(levels.length > 0) levels[levels.length-1].cityName = CITIES[CITIES.length-1].name;
+  }
+
+  // 3D вращение точки
+  function rotate3D(p, rx, ry) {
+    // Вращение вокруг X
+    let y1 = p.y * Math.cos(rx) - p.z * Math.sin(rx);
+    let z1 = p.y * Math.sin(rx) + p.z * Math.cos(rx);
+
+    // Вращение вокруг Y
+    let x2 = p.x * Math.cos(ry) + z1 * Math.sin(ry);
+    let z2 = -p.x * Math.sin(ry) + z1 * Math.cos(ry);
+
+    return { x: x2, y: y1, z: z2 };
+  }
+
+  function resize() {
+    if (!canvas) return;
+    W = canvas.width = window.innerWidth;
+    H = canvas.height = window.innerHeight;
+  }
+
+  function draw() {
+    if (!ctx) return;
+
+    // Очистка
+    ctx.clearRect(0, 0, W, H);
+
+    const cx = W / 2;
+    const cy = H / 2;
+    const R = Math.min(W, H) * 0.35; // Адаптивный радиус
+
+    // Океан (сфера)
+    const g = ctx.createRadialGradient(cx - R*0.3, cy - R*0.3, R*0.1, cx, cy, R);
+    g.addColorStop(0, '#3a6a9a'); // Блики солнца на воде
+    g.addColorStop(0.7, '#1a3a6a');
+    g.addColorStop(1, '#05102a');
+
+    ctx.beginPath();
+    ctx.arc(cx, cy, R, 0, Math.PI * 2);
+    ctx.fillStyle = g;
+    ctx.fill();
+
+    // Атмосферное свечение (halo)
+    ctx.beginPath();
+    ctx.arc(cx, cy, R * 1.05, 0, Math.PI*2);
+    const hg = ctx.createRadialGradient(cx, cy, R*0.95, cx, cy, R*1.05);
+    hg.addColorStop(0, 'rgba(100, 180, 255, 0)');
+    hg.addColorStop(0.5, 'rgba(100, 180, 255, 0.3)');
+    hg.addColorStop(1, 'rgba(100, 180, 255, 0)');
+    ctx.fillStyle = hg;
+    ctx.fill();
+
+    // Континенты
+    ctx.fillStyle = 'rgba(40, 80, 50, 0.4)'; // Зеленоватый оттенок суши
+    for (let p of landmasses) {
+      const pRot = rotate3D(p, rotX, rotY);
+      if (pRot.z < 0) continue; // На обратной стороне
+      const px = cx + pRot.x * R;
+      const py = cy + pRot.y * R;
+      // Размер пятна зависит от перспективы
+      const scale = 0.5 + (pRot.z + 1) * 0.5;
+
+      ctx.beginPath();
+      ctx.arc(px, py, 15 * scale, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // Меридианы и параллели (каркас)
+    ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+    ctx.lineWidth = 1;
+    // Отрисовка сетки
+    for(let i=0; i<6; i++) {
+        // Упрощенная отрисовка экваторов, вращающихся вместе с глобусом
+        ctx.beginPath();
+        ctx.ellipse(cx, cy, R, R * Math.abs(Math.sin(rotX + i*Math.PI/6)), 0, 0, Math.PI*2);
+        ctx.stroke();
+    }
+
+    // Сортировка точек по Z (чтобы рисовать задние позади, а передние спереди)
+    const proj = levels.map(p => {
+      const pRot = rotate3D(p, rotX, rotY);
+      return { ...p, px: cx + pRot.x * R, py: cy + pRot.y * R, pz: pRot.z };
+    });
+
+    proj.sort((a,b) => a.pz - b.pz); // От дальних к ближним
+
+    // Линии маршрута
+    ctx.strokeStyle = 'rgba(212,168,75,0.4)';
+    ctx.setLineDash([5, 5]);
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    let first = true;
+    let lastZVisible = false;
+    for(let i=0; i<proj.length; i++) {
+        const p = proj.find(pt => pt.i === i);
+        if(!p) continue;
+        const isVisible = p.pz >= -0.2;
+        if (!isVisible) {
+            first = true; // Разрыв линии, если ушли за горизонт
+            lastZVisible = false;
+            continue;
+        }
+        if(first) {
+            ctx.moveTo(p.px, p.py);
+            first = false;
+        } else {
+            if(lastZVisible) ctx.lineTo(p.px, p.py);
+            else ctx.moveTo(p.px, p.py);
+        }
+        lastZVisible = true;
+    }
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Точки
+    for(let p of proj) {
+      if (p.pz < 0) continue; // Точка за горизонтом
+
+      // Перспектива: чем ближе (z > 0), тем больше
+      const scale = 0.5 + (p.pz + 1) * 0.5; // от 0.5 до 1.5
+      const size = (p.isBoss ? 8 : 5) * scale;
+
+      let color = '#555'; // locked
+      let glow = false;
+
+      if (p.state === 'done') {
+        color = '#d4a84b'; // gold
+      } else if (p.state === 'avail') {
+        color = '#ff4444'; // active
+        glow = true;
+      }
+
+      if (glow) {
+         ctx.beginPath();
+         ctx.arc(p.px, p.py, size * 2.5, 0, Math.PI*2);
+         ctx.fillStyle = 'rgba(255, 68, 68, 0.4)';
+         ctx.fill();
+      }
+
+      ctx.beginPath();
+      ctx.arc(p.px, p.py, size, 0, Math.PI*2);
+      ctx.fillStyle = color;
+      ctx.fill();
+      ctx.strokeStyle = '#222';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+
+      // Иконка самолетика на активном уровне
+      if (p.state === 'avail') {
+         ctx.font = `${Math.floor(16 * scale)}px Arial`;
+         ctx.textAlign = 'center';
+         ctx.textBaseline = 'bottom';
+         ctx.fillStyle = '#fff';
+         ctx.fillText('✈', p.px, p.py - size - 2);
+      }
+
+      // Название города
+      if (p.cityName && scale > 0.8) {
+         ctx.font = `${Math.floor(10 * scale)}px 'IM Fell English SC', serif`;
+         ctx.textAlign = 'center';
+         ctx.textBaseline = 'top';
+         ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+         ctx.fillText(p.cityName, p.px, p.py + size + 4);
+      }
+    }
+  }
+
+  function loop() {
+    if (!running) return;
+
+    // Инерция
+    rotX += vRotX;
+    rotY += vRotY;
+
+    vRotX *= 0.95;
+    vRotY = vRotY * 0.95 + 0.002 * 0.05; // Автоматическое вращение вправо
+
+    draw();
+    raf = requestAnimationFrame(loop);
   }
 
   function renderMap() {
     const app = document.getElementById('app');
     if (!app) return;
-    scale = 1; tx = 0; ty = 0;
-    const levels = window.LEVELS || [];
-    const doneCount = (window.Save?.data?.done || []).length;
-    const totalStars = Object.values(window.Save?.data?.stars || {}).reduce((a,b)=>a+b,0);
-    const coins = window.Save?.data?.coins || 0;
-    const maxStars = levels.length * 3;
-    const lang = window.I18n?.getLang?.() || 'ru';
-    const localeMap = { ru: 'ru-RU', en: 'en-US', tr: 'tr-TR', zh: 'zh-CN' };
-    const locale = localeMap[lang] || 'ru-RU';
+
+    const done = window.Save?.data?.done || [];
+    const daysLeft = 80 - done.length;
 
     app.innerHTML = `
       <style>
-        #app { position:fixed !important; inset:0 !important; width:100vw !important; height:100vh !important; overflow:hidden !important; display:block !important; background:${PARCHMENT}; }
-        @keyframes pulseGold { 0%,100%{box-shadow:0 0 6px rgba(184,134,11,.4),0 2px 8px rgba(60,40,20,.3);} 50%{box-shadow:0 0 20px rgba(184,134,11,.8),0 2px 12px rgba(60,40,20,.4);} }
-        @keyframes fadeInUp { from{opacity:0;transform:translateX(-50%) translateY(20px);} to{opacity:1;transform:translateX(-50%) translateY(0);} }
-        .ink-btn { display:inline-flex;align-items:center;gap:8px;padding:10px 20px;border-radius:6px;font-family:'IM Fell English SC',serif;font-size:13px;letter-spacing:0.08em;text-transform:uppercase;background:linear-gradient(180deg,rgba(245,230,200,0.9),rgba(232,213,168,0.8));color:${INK};border:1.5px solid ${INK};cursor:pointer;transition:all .25s;box-shadow:0 2px 6px rgba(60,40,20,.2); }
-        .ink-btn:hover { background:linear-gradient(180deg,${INK},#2a1a0a); color:${CREAM}; transform:translateY(-1px); box-shadow:0 4px 12px rgba(60,40,20,.4); }
-        .ink-chip { display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:999px;font-size:12px;background:linear-gradient(180deg,rgba(245,230,200,0.8),rgba(232,213,168,0.6));border:1px solid rgba(61,43,22,.3);color:${INK};backdrop-filter:blur(8px);box-shadow:0 1px 4px rgba(60,40,20,.15); }
-        .ink-chip b { color:${GOLD}; }
-        .zoom-btn { width:40px;height:40px;border-radius:8px;font-size:20px;font-weight:700;cursor:pointer;border:1.5px solid ${INK};background:linear-gradient(180deg,rgba(245,230,200,0.95),rgba(232,213,168,0.85));color:${INK};transition:all .2s;box-shadow:0 2px 6px rgba(60,40,20,.25); }
-        .zoom-btn:hover { background:linear-gradient(180deg,${INK},#2a1a0a); color:${CREAM}; transform:scale(1.05); }
-        .city-label { position:absolute;transform:translate(-50%,-50%);font-family:'Cormorant Garamond',serif;font-style:italic;font-size:calc(13px * var(--lz,1));color:${INK};letter-spacing:0.04em;white-space:nowrap;cursor:pointer;pointer-events:auto;opacity:0.85;text-shadow:0 1px 3px rgba(245,230,200,0.8); }
-        .city-label:hover { text-decoration:underline; opacity:1; color:${GOLD}; }
-        .sea-label { position:absolute;transform:translate(-50%,-50%);font-family:'IM Fell English SC',serif;font-size:calc(13px * var(--lz,1));color:rgba(80,120,160,0.6);letter-spacing:0.3em;white-space:nowrap;pointer-events:none; }
-        .region-label { position:absolute;transform:translate(-50%,-50%);font-family:'IM Fell English SC',serif;font-size:calc(15px * var(--lz,1));color:rgba(61,43,22,0.3);letter-spacing:0.2em;white-space:nowrap;pointer-events:none; }
-        .map-point { position:absolute;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:'IM Fell English SC',serif;font-weight:700;cursor:pointer;transition:all .3s;border:2.5px solid ${INK};z-index:2;color:${INK};box-shadow:0 3px 8px rgba(60,40,20,.35); }
-        .map-point .num { font-size:13px; line-height:1; font-weight:700; }
-        .map-point.boss .num { font-size:16px; }
-        .map-point .crown { position:absolute;top:-18px;left:50%;transform:translateX(-50%);font-size:15px;color:#8a2f1d;text-shadow:0 1px 3px rgba(245,230,200,0.8); }
-        .map-point .star-dots { position:absolute;top:-12px;left:50%;transform:translateX(-50%);font-size:8px;color:${GOLD};white-space:nowrap;letter-spacing:1px;text-shadow:0 1px 2px rgba(245,230,200,0.9); }
-        .map-point.available { background:radial-gradient(circle at 35% 30%, #d4a84b, #b8860b 50%, #8a6508); border-color:#6a4a08; color:#1a0f00; animation:pulseGold 2.5s infinite; }
-        .map-point.available .num { text-shadow:0 1px 2px rgba(255,255,255,0.3); }
-        .map-point.done { background:linear-gradient(180deg,#4a3a2a,#3d2b16); border-color:#2a1a0a; color:${CREAM}; }
-        .map-point.locked { background:rgba(61,43,22,0.08); border-color:rgba(61,43,22,0.25); color:rgba(61,43,22,0.4); cursor:not-allowed; box-shadow:none; }
-        .map-point.boss { background:radial-gradient(circle at 35% 30%, #c05a3a, #8a2f1d 50%, #5a1a0e); border-color:#3a0a05; color:#ffe8b0; }
-        .map-point.boss.locked { background:rgba(61,43,22,0.08); border-color:rgba(138,47,29,0.25); color:rgba(138,47,29,0.4); box-shadow:none; animation:none; }
-        .map-point:not(.locked):hover { transform:scale(1.25); z-index:3; box-shadow:0 6px 20px rgba(60,40,20,.5); }
-        .legend-item { display:flex;align-items:center;gap:8px;font-size:11px;color:${INK};opacity:0.8; }
-        .legend-dot { width:12px;height:12px;border-radius:50%;border:1.5px solid ${INK};flex-shrink:0; }
+        #app { background: #000; overflow: hidden; }
+        .hud-top { position:absolute; top:20px; left:20px; right:20px; display:flex; justify-content:space-between; z-index:10; }
+        .glass-panel { background: rgba(10,20,40,0.6); border: 1px solid rgba(212,168,75,0.4); border-radius: 12px; padding: 10px 20px; color: #f0d080; font-family: 'IM Fell English SC', serif; backdrop-filter: blur(10px); }
+        .btn-back { cursor:pointer; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); border-radius: 99px; padding: 10px 24px; color: #fff; font-size: 14px; text-transform:uppercase; letter-spacing:1px; }
+        .btn-back:hover { background: rgba(255,255,255,0.2); }
+        .btn-fly { position:absolute; bottom: 40px; left:50%; transform:translateX(-50%); cursor:pointer; background: linear-gradient(180deg,#ffd080,#d4a84b); border:none; border-radius: 99px; padding: 16px 40px; color: #1a0f00; font-size: 20px; font-weight:bold; font-family: 'IM Fell English SC', serif; box-shadow: 0 4px 20px rgba(212,168,75,0.4); transition: transform 0.2s; z-index:10;}
+        .btn-fly:hover { transform:translateX(-50%) scale(1.05); }
       </style>
 
-      <div style="position:fixed;inset:0;background:radial-gradient(ellipse at 50% 40%, #f0e0c0 0%, ${PARCHMENT} 50%, #c8a870 100%);"></div>
-      <div style="position:fixed;inset:0;pointer-events:none;background:
-        radial-gradient(circle at 15% 20%, rgba(184,134,11,0.08) 0%, transparent 15%),
-        radial-gradient(circle at 80% 70%, rgba(184,134,11,0.06) 0%, transparent 18%),
-        radial-gradient(circle at 60% 15%, rgba(138,47,29,0.04) 0%, transparent 12%),
-        radial-gradient(circle at 30% 85%, rgba(120,90,50,0.08) 0%, transparent 14%);"></div>
-      <div style="position:fixed;inset:0;pointer-events:none;background:radial-gradient(ellipse at center, transparent 50%, rgba(60,40,20,0.4) 100%);box-shadow:inset 0 0 80px rgba(60,40,20,0.3);"></div>
-      <svg style="position:fixed;inset:0;width:100%;height:100%;opacity:0.4;pointer-events:none;mix-blend-mode:multiply;">
-        <filter id="paperNoise"><feTurbulence type="fractalNoise" baseFrequency="0.65" numOctaves="4" seed="3"/><feColorMatrix type="saturate" values="0"/><feComponentTransfer><feFuncA type="linear" slope="0.08"/></feComponentTransfer></filter>
-        <rect width="100%" height="100%" filter="url(#paperNoise)"/>
-      </svg>
+      <canvas id="globeCanvas" style="position:absolute; inset:0; width:100%; height:100%; cursor:grab;"></canvas>
 
-      <div style="position:fixed;inset:0;display:flex;flex-direction:column;z-index:1;">
-        <div style="display:flex;justify-content:space-between;align-items:center;padding:16px 24px 8px;flex-wrap:wrap;gap:10px;">
-          <button class="ink-btn" data-go="menu">${t('back')}</button>
-          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-            <span class="ink-chip">🗺️ <b>${doneCount}</b>/${levels.length}</span>
-            <span class="ink-chip">⭐ <b>${totalStars}</b>/${maxStars}</span>
-            <span class="ink-chip">🪙 <b>${coins.toLocaleString(locale)}</b></span>
-          </div>
+      <div class="hud-top">
+        <button id="btnMapBack" class="btn-back">${t('back')}</button>
+        <div class="glass-panel" style="font-size:24px; text-align:center;">
+           КРУГОСВѢТНЫЙ ПОЛЁТЪ<br>
+           <span style="font-size:16px; color:#fff;">Осталось дней: ${daysLeft} из 80</span>
         </div>
-
-        <div style="text-align:center;padding:4px 24px 10px;">
-          <div style="display:inline-block;position:relative;padding:12px 40px;background:linear-gradient(180deg,rgba(245,230,200,0.7),rgba(232,213,168,0.5));border:2px solid ${INK};border-radius:4px;box-shadow:0 4px 16px rgba(60,40,20,.2),inset 0 1px 0 rgba(255,255,255,.3);">
-            <div style="position:absolute;inset:3px;border:1px solid rgba(184,134,11,.3);border-radius:2px;pointer-events:none;"></div>
-            <div style="font-family:'IM Fell English SC',serif;font-size:clamp(18px,3.2vw,30px);color:${INK};letter-spacing:0.1em;line-height:1.1;">${t('mapTitle')}</div>
-            <div style="font-family:'Cormorant Garamond',serif;font-style:italic;font-size:12px;color:rgba(61,43,22,0.6);margin-top:3px;">${t('mapSubtitle')}</div>
-          </div>
-        </div>
-
-        <div id="mapViewport" style="flex:1;position:relative;margin:0 20px 16px;border:2px solid ${INK};border-radius:6px;overflow:hidden;touch-action:none;cursor:grab;box-shadow:0 4px 20px rgba(60,40,20,.3),inset 0 0 30px rgba(60,40,20,.15);background:linear-gradient(180deg,rgba(240,224,192,0.3),rgba(200,168,112,0.2));">
-          <div id="mapWorld" style="position:absolute;left:0;top:0;">
-            ${renderLand()}
-            ${REGIONS.map(r => `<div class="region-label" style="left:${r.x}%;top:${r.y}%;">${r.name}</div>`).join('')}
-            ${SEAS.map(s => `<div class="sea-label" style="left:${s.x}%;top:${s.y}%;">${s.name}</div>`).join('')}
-            ${CITIES.map(c => `<div class="city-label" data-x="${c.x}" data-y="${c.y}" style="left:${c.x}%;top:${c.y - 2.5}%;">${c.name}</div>`).join('')}
-            ${levels.map((lv, i) => pointHTML(lv, i)).join('')}
-          </div>
-
-          <div style="position:absolute;right:10px;bottom:10px;display:flex;flex-direction:column;gap:6px;z-index:6;">
-            <button class="zoom-btn" id="zoomIn">+</button>
-            <button class="zoom-btn" id="zoomOut">−</button>
-            <button class="zoom-btn" id="zoomReset" style="font-size:15px;">⌂</button>
-          </div>
-
-          <div style="position:absolute;left:10px;bottom:8px;display:flex;flex-direction:column;gap:4px;z-index:6;pointer-events:none;">
-            <div class="legend-item"><div class="legend-dot" style="background:radial-gradient(circle at 35% 30%,#d4a84b,#b8860b);"></div>${t('available')}</div>
-            <div class="legend-item"><div class="legend-dot" style="background:linear-gradient(180deg,#4a3a2a,#3d2b16);"></div>${t('completed')}</div>
-            <div class="legend-item"><div class="legend-dot" style="background:radial-gradient(circle at 35% 30%,#c05a3a,#8a2f1d);"></div>${t('boss')}</div>
-            <div class="legend-item"><div class="legend-dot" style="background:rgba(61,43,22,0.1);border-color:rgba(61,43,22,0.25);"></div>${t('locked')}</div>
-          </div>
-
-          <div style="position:absolute;right:10px;top:10px;z-index:6;pointer-events:none;">
-            <div style="background:linear-gradient(180deg,rgba(245,230,200,0.85),rgba(232,213,168,0.7));border:1px solid rgba(61,43,22,.3);border-radius:6px;padding:6px 12px;font-size:10px;color:${INK};font-family:'Cormorant Garamond',serif;backdrop-filter:blur(6px);box-shadow:0 2px 6px rgba(60,40,20,.15);">
-              <div style="display:flex;align-items:center;gap:4px;"><span style="color:${GOLD};">━━━</span> ${t('flightRoute')}</div>
-              <div style="display:flex;align-items:center;gap:4px;margin-top:2px;"><span style="color:${GOLD};">●</span> ${t('city')}</div>
-              <div style="display:flex;align-items:center;gap:4px;margin-top:2px;"><span style="color:${GOLD};">▲</span> ${t('mountains')}</div>
-            </div>
-          </div>
-        </div>
+        <div class="glass-panel">🪙 ${window.Save?.data?.coins || 0}</div>
       </div>
 
-      <div id="levelPopup" style="position:fixed;left:50%;bottom:20px;transform:translateX(-50%);width:min(500px,94%);background:linear-gradient(180deg,#f0e0c0,#e3d3ae);border:2px solid ${INK};border-radius:10px;padding:0;z-index:10;display:none;box-shadow:0 16px 50px rgba(60,40,20,.5),0 0 0 1px rgba(184,134,11,.2);color:${INK};animation:fadeInUp .35s ease-out;overflow:hidden;">
-        <div id="popupContent"></div>
-      </div>
+      <button id="btnFlyGlobal" class="btn-fly">✈ ВЪ ПОЛЁТЪ!</button>
     `;
 
-    world = document.getElementById('mapWorld');
-    viewport = document.getElementById('mapViewport');
-    apply(false);
-    setupZoom();
-    setupHandlers();
-    log('✓ Карта Имперіи Котовъ съ ' + levels.length + ' точками готова');
-  }
+    canvas = document.getElementById('globeCanvas');
+    ctx = canvas.getContext('2d');
 
-  function setupZoom() {
-    if (!viewport || !world) return;
-    window.addEventListener('resize', () => { clamp(); apply(false); });
-    viewport.addEventListener('wheel', (e) => { e.preventDefault(); const r = viewport.getBoundingClientRect();
-      setZoom(scale * (e.deltaY < 0 ? 1.2 : 1/1.2), e.clientX - r.left, e.clientY - r.top, false); }, { passive: false });
-    const pointers = new Map(); let lastDist = 0;
-    viewport.addEventListener('pointerdown', (e) => {
-      if (e.target.closest('.map-point') || e.target.closest('.city-label') || e.target.closest('.zoom-btn')) return;
-      pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
-      viewport.setPointerCapture(e.pointerId);
-      if (pointers.size === 2) { const p = [...pointers.values()]; lastDist = Math.hypot(p[0].x-p[1].x, p[0].y-p[1].y); } });
-    viewport.addEventListener('pointermove', (e) => {
-      if (!pointers.has(e.pointerId)) return;
-      const prev = pointers.get(e.pointerId), cur = { x: e.clientX, y: e.clientY };
-      if (pointers.size === 1) { tx += cur.x-prev.x; ty += cur.y-prev.y; clamp(); apply(false); }
-      else if (pointers.size === 2) { pointers.set(e.pointerId, cur); const p = [...pointers.values()];
-        const d = Math.hypot(p[0].x-p[1].x, p[0].y-p[1].y); const r = viewport.getBoundingClientRect();
-        if (lastDist > 0) setZoom(scale * (d/lastDist), (p[0].x+p[1].x)/2 - r.left, (p[0].y+p[1].y)/2 - r.top, false);
-        lastDist = d; return; }
-      pointers.set(e.pointerId, cur); });
-    const drop = (e) => { pointers.delete(e.pointerId); lastDist = 0; };
-    viewport.addEventListener('pointerup', drop);
-    viewport.addEventListener('pointercancel', drop);
-    viewport.addEventListener('dblclick', (e) => { if (e.target.closest('.map-point') || e.target.closest('.zoom-btn')) return;
-      const r = viewport.getBoundingClientRect(); setZoom(scale * 1.6, e.clientX - r.left, e.clientY - r.top, true); });
-    document.getElementById('zoomIn').onclick = () => { const r = viewport.getBoundingClientRect(); setZoom(scale*1.4, r.width/2, r.height/2, true); };
-    document.getElementById('zoomOut').onclick = () => { const r = viewport.getBoundingClientRect(); setZoom(scale/1.4, r.width/2, r.height/2, true); };
-    document.getElementById('zoomReset').onclick = resetZoom;
-    document.querySelectorAll('.city-label').forEach(l => { l.onclick = () => zoomToPercent(parseFloat(l.getAttribute('data-x')), parseFloat(l.getAttribute('data-y')), 2.6); });
-  }
+    onMouseUp = () => { if (canvas) { isDragging = false; canvas.style.cursor='grab'; } };
+    onTouchEnd = () => { isDragging = false; };
+    onResize = () => resize();
 
-  function showPopup(i) {
-    const level = (window.LEVELS || [])[i]; if (!level) return;
-    const W = (window.CONSTANTS && window.CONSTANTS.WEATHER) || {};
-    const T = (window.CONSTANTS && window.CONSTANTS.TYPE_NAMES) || {};
-    const weather = W[level.w] || { i: '☀️', name: 'Ясно' };
-    const typeName = T[level.t] || level.t;
-    const stars = getStars(i), unlocked = isUnlocked(i), place = PLACES[i % PLACES.length] || t('unknownLands');
-    let starsHTML = '';
-    for (let s = 1; s <= 3; s++) starsHTML += `<span style="color:${s <= stars ? GOLD : 'rgba(61,43,22,0.2)'};font-size:20px;">★</span>`;
-    const popup = document.getElementById('levelPopup'), content = document.getElementById('popupContent');
-    if (!popup || !content) return;
-    const progress = Math.round((i / ((window.LEVELS||[]).length || 1)) * 100);
-    content.innerHTML = `
-      <div style="background:linear-gradient(180deg,rgba(184,134,11,0.15),rgba(184,134,11,0.05));padding:16px 22px 12px;border-bottom:1px solid rgba(61,43,22,.15);">
-        <div style="display:flex;justify-content:space-between;align-items:flex-start;">
-          <div>
-            <div style="font-size:10px;letter-spacing:0.15em;text-transform:uppercase;font-family:'IM Fell English SC',serif;opacity:0.6;">${t('levelNum')} ${i+1} · ${level.y} ${t('year')} · ${place}</div>
-            <div style="font-family:'IM Fell English SC',serif;font-size:22px;margin-top:3px;color:${INK};">${level.n}</div>
-          </div>
-          <button id="popupClose" style="background:rgba(61,43,22,.1);border:1px solid rgba(61,43,22,.2);color:${INK};font-size:16px;cursor:pointer;padding:4px 10px;border-radius:4px;transition:all .2s;">✕</button>
-        </div>
-      </div>
-      <div style="padding:14px 22px 18px;">
-        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;">
-          <span class="ink-chip">${weather.i} ${weather.name}</span>
-          <span class="ink-chip">📋 ${typeName}</span>
-          <span class="ink-chip">📏 ${level.dist} ${t('vs')}</span>
-          ${level.boss ? `<span class="ink-chip" style="border-color:rgba(138,47,29,.4);color:#8a2f1d;">♛ ${level.boss}</span>` : ''}
-        </div>
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
-          <div style="display:flex;align-items:center;gap:4px;">${starsHTML}</div>
-          <div style="font-size:11px;color:rgba(61,43,22,.5);font-family:'Cormorant Garamond',serif;">${t('progress')}: ${progress}%</div>
-        </div>
-        <div style="height:4px;background:rgba(61,43,22,.1);border-radius:99px;overflow:hidden;margin-bottom:16px;">
-          <div style="height:100%;width:${progress}%;background:linear-gradient(90deg,${GOLD},#d4a84b);border-radius:99px;transition:width .5s;"></div>
-        </div>
-        <button id="popupFly" class="ink-btn" style="width:100%;justify-content:center;padding:14px;font-size:15px;${unlocked ? 'background:linear-gradient(180deg,#d4a84b,#b8860b);color:#1a0f00;border-color:#8a6508;font-weight:700;' : 'opacity:0.4;cursor:not-allowed;'}">${unlocked ? t('flyBtn') : t('lockedBtn')}</button>
-      </div>`;
-    popup.style.display = 'block';
-    document.getElementById('popupClose').onclick = () => { popup.style.display = 'none'; };
-    document.getElementById('popupClose').onmouseenter = function() { this.style.background = 'rgba(61,43,22,.2)'; };
-    document.getElementById('popupClose').onmouseleave = function() { this.style.background = 'rgba(61,43,22,.1)'; };
-    const fly = document.getElementById('popupFly');
-    if (fly && unlocked) fly.onclick = () => {
-      try { window.Sound?.click?.(); } catch (e) {}
-      popup.style.display = 'none';
-      if (window.Briefing && typeof window.Briefing.show === 'function') window.Briefing.show(i, () => { if (window.Flight?.start) window.Flight.start(i); });
-      else if (window.Flight?.start) window.Flight.start(i);
-      else window.UI?.toast?.(t('flightDevWarn'), 'warn');
-    };
-  }
-
-  function setupHandlers() {
-    const back = document.querySelector('[data-go="menu"]');
-    if (back) back.onclick = () => { try { window.Sound?.click?.(); } catch (e) {} if (window.Screens?.show) window.Screens.show('menu'); };
-    document.querySelectorAll('.map-point').forEach(pt => {
-      pt.onclick = () => {
-        const i = parseInt(pt.getAttribute('data-level'), 10);
-        if (!isUnlocked(i)) { window.UI?.toast?.(t('prevLevelWarn'), 'warn'); return; }
-        try { window.Sound?.click?.(); } catch (e) {}
-        showPopup(i);
-      };
+    // События мыши/тача для вращения
+    canvas.addEventListener('mousedown', e => { isDragging = true; lastMouse = {x: e.clientX, y: e.clientY}; canvas.style.cursor='grabbing'; });
+    canvas.addEventListener('mousemove', e => {
+      if(!isDragging) return;
+      const dx = e.clientX - lastMouse.x;
+      const dy = e.clientY - lastMouse.y;
+      vRotY = dx * 0.005;
+      vRotX = dy * 0.005;
+      lastMouse = {x: e.clientX, y: e.clientY};
     });
+    window.addEventListener('mouseup', onMouseUp);
+
+    canvas.addEventListener('touchstart', e => { isDragging = true; lastMouse = {x: e.touches[0].clientX, y: e.touches[0].clientY}; });
+    canvas.addEventListener('touchmove', e => {
+      if(!isDragging) return;
+      const dx = e.touches[0].clientX - lastMouse.x;
+      const dy = e.touches[0].clientY - lastMouse.y;
+      vRotY = dx * 0.005;
+      vRotX = dy * 0.005;
+      lastMouse = {x: e.touches[0].clientX, y: e.touches[0].clientY};
+    });
+    window.addEventListener('touchend', onTouchEnd);
+
+    function cleanup() {
+      running = false;
+      cancelAnimationFrame(raf);
+      window.removeEventListener('mouseup', onMouseUp);
+      window.removeEventListener('touchend', onTouchEnd);
+      window.removeEventListener('resize', onResize);
+    }
+
+    document.getElementById('btnMapBack').onclick = () => {
+      cleanup();
+      if(window.Screens?.show) window.Screens.show('menu');
+    };
+
+    document.getElementById('btnFlyGlobal').onclick = () => {
+       const done = window.Save?.data?.done || [];
+       let next = 0; while (next < 80 && done.includes(next)) next++;
+       if(next >= 80) { if (window.UI?.toast) window.UI.toast('Кругосвѣтное путешествіе завершено!', 'success'); return; }
+       cleanup();
+       if (window.Briefing?.show) window.Briefing.show(next, () => { if (window.Flight?.start) window.Flight.start(next); });
+       else if (window.Flight?.start) window.Flight.start(next);
+    };
+
+    window.addEventListener('resize', onResize);
+    resize();
+    initContinents();
+    initLevels();
+
+    running = true;
+    raf = requestAnimationFrame(loop);
+    log('✓ 3D Глобус отрисован');
   }
 
-  if (window.Screens && typeof window.Screens.register === 'function') { window.Screens.register('map', renderMap); log('Экранъ карты готовъ'); }
-  if (window.Events && typeof window.Events.on === 'function') {
-    window.Events.on('screen:changed', (n) => { if (n === 'map') setTimeout(renderMap, 100); }, 'MapScreen');
-  }
+  if (window.Screens?.register) { window.Screens.register('map', renderMap); }
 })();
