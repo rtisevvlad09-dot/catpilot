@@ -360,18 +360,41 @@ function draw(){
   for(let e of enemies){drawShadow(e.x,e.y,1);drawPlane(e.x,e.y,'#5a5a6a',-1,1,0);}
   // --- New Obstacle Draw Logic ---
   for(let b of birds) {
+    let wingY = Math.sin(time * 15 + b.ph) * 12; // Animate wings flapping
+    ctx.fillStyle = '#111';
+    // Body
+    ctx.beginPath();
+    ctx.ellipse(b.x, b.y, 10, 4, 0, 0, Math.PI * 2);
+    ctx.fill();
+    // Tail
+    ctx.beginPath();
+    ctx.moveTo(b.x + 8, b.y);
+    ctx.lineTo(b.x + 16, b.y - 4);
+    ctx.lineTo(b.x + 16, b.y + 4);
+    ctx.fill();
+    // Beak
+    ctx.fillStyle = '#da0';
+    ctx.beginPath();
+    ctx.moveTo(b.x - 8, b.y);
+    ctx.lineTo(b.x - 14, b.y - 2);
+    ctx.lineTo(b.x - 12, b.y + 2);
+    ctx.fill();
+    // Wings
     ctx.strokeStyle = '#222';
     ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.moveTo(b.x + 8, b.y - 4);
-    ctx.quadraticCurveTo(b.x, b.y - 8, b.x - 8, b.y);
-    ctx.moveTo(b.x + 8, b.y + 4);
-    ctx.quadraticCurveTo(b.x, b.y + 8, b.x - 8, b.y);
+    // Far wing
+    ctx.moveTo(b.x, b.y);
+    ctx.quadraticCurveTo(b.x - 4, b.y - wingY / 2, b.x - 8, b.y - wingY);
+    // Near wing
+    ctx.moveTo(b.x, b.y);
+    ctx.quadraticCurveTo(b.x - 6, b.y + wingY / 2, b.x - 12, b.y + wingY);
     ctx.stroke();
   }
 
   for(let a of airships) {
     drawShadow(a.x, a.y + 40, 1.5);
+
     // Envelope
     ctx.fillStyle = '#cfd3cd';
     ctx.strokeStyle = '#5c636a';
@@ -380,11 +403,45 @@ function draw(){
     ctx.ellipse(a.x, a.y, 60, 25, 0, 0, Math.PI*2);
     ctx.fill();
     ctx.stroke();
+
+    // Envelope Details (Lines)
+    ctx.beginPath();
+    ctx.moveTo(a.x - 40, a.y - 18); ctx.lineTo(a.x + 40, a.y - 18);
+    ctx.moveTo(a.x - 55, a.y - 8);  ctx.lineTo(a.x + 55, a.y - 8);
+    ctx.moveTo(a.x - 55, a.y + 8);  ctx.lineTo(a.x + 55, a.y + 8);
+    ctx.moveTo(a.x - 40, a.y + 18); ctx.lineTo(a.x + 40, a.y + 18);
+    ctx.stroke();
+
+    // Gondola Attachments (Ropes)
+    ctx.beginPath();
+    ctx.moveTo(a.x - 10, a.y + 25); ctx.lineTo(a.x - 20, a.y + 15);
+    ctx.moveTo(a.x + 10, a.y + 25); ctx.lineTo(a.x + 20, a.y + 15);
+    ctx.stroke();
+
     // Gondola
     ctx.fillStyle = '#6e5c47';
     ctx.fillRect(a.x - 15, a.y + 25, 30, 10);
+    ctx.strokeRect(a.x - 15, a.y + 25, 30, 10);
+
+    // Gondola Windows
+    ctx.fillStyle = '#e0f7fa';
+    for(let wx = a.x - 10; wx <= a.x + 10; wx += 8) {
+      ctx.fillRect(wx, a.y + 28, 4, 4);
+    }
+
+    // Propeller (animated)
+    ctx.strokeStyle = '#222';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    let propAngle = time * 20; // Fast rotation
+    let px = a.x - 15, py = a.y + 30;
+    ctx.moveTo(px, py - Math.sin(propAngle)*8);
+    ctx.lineTo(px, py + Math.sin(propAngle)*8);
+    ctx.stroke();
+
     // Tail fins
     ctx.fillStyle = '#852b2b';
+    ctx.lineWidth = 2;
     ctx.beginPath();
     ctx.moveTo(a.x + 50, a.y);
     ctx.lineTo(a.x + 70, a.y - 15);
@@ -458,35 +515,81 @@ function drawHills(sp,col,base,amp){
 
   const shadeHex = (hex, amt) => hex.startsWith('#') ? shade(hex, amt) : hex;
 
+  // Дополнительная детализация пейзажей
   if(col === '#2a4a38' || col === '#3a6a4a' || col === '#1a2a38') {
-      ctx.fillStyle = shadeHex(col, -0.2);
-      for(let x=-240;x<W+240;x+=60){
-         const xx = x - off%60;
-         const yy = base - amp*0.5 + Math.sin(x)*amp*0.3;
+      // Многоуровневый лес с тенями
+      for(let x=-240;x<W+240;x+=40){
+         const wx = x + dist * sp * 4;
+         const xx = x - off%40;
+         const yy = base - amp*0.5 + Math.sin(wx*0.01)*amp*0.3;
+         // Тень дерева
+         ctx.fillStyle = shadeHex(col, -0.3);
+         ctx.beginPath();
+         ctx.moveTo(xx+2, yy); ctx.lineTo(xx-6, yy+20); ctx.lineTo(xx+10, yy+20); ctx.fill();
+         // Освещенная часть
+         ctx.fillStyle = shadeHex(col, 0.1);
          ctx.beginPath();
          ctx.moveTo(xx, yy); ctx.lineTo(xx-8, yy+20); ctx.lineTo(xx+8, yy+20); ctx.fill();
       }
   } else if(col === 'rgba(150,180,200,.8)' || col === '#8aa0b0' || col === '#6a8090') {
-      ctx.fillStyle = 'rgba(255,255,255,0.4)';
+      // Сложные снежные шапки на горах
       for(let x=-240;x<W+240;x+=120){
+         const wx = x + dist * sp * 4;
          const xx = x - off%120;
-         const yy = base - amp + Math.cos(x)*amp*0.1;
+         const yy = base - amp + Math.cos(wx*0.02)*amp*0.2;
+
+         ctx.fillStyle = 'rgba(255,255,255,0.7)';
          ctx.beginPath();
-         ctx.moveTo(xx+40, yy); ctx.lineTo(xx+30, yy+15); ctx.lineTo(xx+50, yy+15); ctx.fill();
+         ctx.moveTo(xx+120, yy-20);
+         ctx.lineTo(xx+100, yy+10);
+         ctx.lineTo(xx+110, yy+15); // Зазубрины
+         ctx.lineTo(xx+120, yy+5);
+         ctx.lineTo(xx+130, yy+20);
+         ctx.lineTo(xx+140, yy+10);
+         ctx.fill();
       }
   } else if(col === '#a0703a' || col === '#704a20') {
-      ctx.strokeStyle = shadeHex(col, -0.15);
-      ctx.lineWidth = 3;
-      for(let x=-240;x<W+240;x+=140){
-         const xx = x - off%140;
-         const yy = base - amp*0.3;
+      // Песчаные дюны с градиентами (волны)
+      ctx.strokeStyle = shadeHex(col, -0.2);
+      ctx.lineWidth = 2;
+      for(let x=-240;x<W+240;x+=90){
+         const wx = x + dist * sp * 4;
+         const xx = x - off%90;
+         const yy = base - amp*0.4 + Math.sin(wx*0.05)*10;
+
          ctx.beginPath();
          ctx.moveTo(xx, yy);
-         ctx.quadraticCurveTo(xx+30, yy-10, xx+80, yy+10);
+         ctx.quadraticCurveTo(xx+40, yy-15, xx+80, yy+5);
          ctx.stroke();
+
+         ctx.strokeStyle = shadeHex(col, 0.1);
+         ctx.beginPath();
+         ctx.moveTo(xx+10, yy+5);
+         ctx.quadraticCurveTo(xx+50, yy-10, xx+90, yy+10);
+         ctx.stroke();
+      }
+  } else if(col === '#1a2a3a' || col === '#0a1020') {
+      // Городские силуэты для ночных уровней
+      ctx.fillStyle = shadeHex(col, -0.2);
+      for(let x=-240;x<W+240;x+=60){
+          const wx = x + dist * sp * 4;
+          const xx = x - off%60;
+          const yy = base - amp*0.6;
+          const height = 15 + (Math.abs(Math.sin(wx * 11)) * 30);
+          const width = 15 + (Math.abs(Math.cos(wx * 7)) * 20);
+          ctx.fillRect(xx, yy - height, width, height + 20);
+
+          // Светящиеся окна
+          ctx.fillStyle = (Math.sin(wx * 17) > 0) ? '#ffcc00' : '#444';
+          if(height > 20) {
+              ctx.fillRect(xx + 5, yy - height + 5, 3, 3);
+              ctx.fillRect(xx + 15, yy - height + 5, 3, 3);
+          }
+          ctx.fillStyle = shadeHex(col, -0.2);
       }
   }
 }
+
 function drawClouds(a,op){
   ctx.fillStyle=`rgba(255,255,255,${0.35*op+0.2})`;
   if(level.w === 'STORM' || level.w === 'RAIN') {
