@@ -385,6 +385,7 @@
     document.getElementById('btnFlyGlobal').onclick = () => {
        const done = window.Save?.data?.done || [];
        let next = 0; while (next < 80 && done.includes(next)) next++;
+       if(next >= 80) { if (window.UI?.toast) window.UI.toast('Кругосвѣтное путешествіе завершено!', 'success'); return; }
        cleanup();
        if (window.Briefing?.show) window.Briefing.show(next, () => { if (window.Flight?.start) window.Flight.start(next); });
        else if (window.Flight?.start) window.Flight.start(next);
