@@ -1,9 +1,9 @@
 (function(){if(!window.BossRegistry)return;
 window.BossRegistry.register('boss15',{
-name:'Чёрный Барсъ',type:'bomber',color:'#1a1a2a',hp:400,rate:0.85,size:2.3,
-bg:['#0a0a1a','#1a1a2a','#2a2a3a'],music:'boss15',
-taunt:'«Я тѣнь смерти!»',
-tune:{bulletSpeed:240},
-prop:[31,53,.92],
-update:(b,dt,E)=>{b.a=(b.a||0)+dt;if(b.a>3){b.a=0;for(let i=0;i<5;i++)E.minion();}}
+name:'Баронъ Штопоръ',type:'ace',color:'#ff3333',hp:190,rate:0.6,size:1.4,
+bg:['#330000','#440000','#550000'],music:'boss15',
+taunt:'«Держись крѣпче!»',
+tune:{bulletSpeed:310,spread:1,telegraph:0.4},
+prop:[35,45,0.9],
+update:(b,dt,E)=>{b.t=(b.t||0)+dt;if(b.y < window.innerHeight/2 && !b.up) b.y += 5; else {b.up = true; b.y -= 2; if(b.y < 50) b.up = false;} b.x += Math.sin(b.y/20)*10; if (Math.random() < 0.05) b.fire();}
 });})();

@@ -30,68 +30,30 @@
 
   function upCard(u,d){
     const lvl=d.up[u.key]||0, maxed=lvl>=u.max, c=cost(u,lvl), can=(d.coins||0)>=c;
-    return `<div style="background:linear-gradient(180deg,rgba(212,168,75,.1),rgba(212,168,75,.03));border:1px solid rgba(212,168,75,.25);border-radius:10px;padding:18px;backdrop-filter:blur(12px);display:flex;flex-direction:column;gap:10px;">
-      <div style="display:flex;justify-content:space-between;">
+    const reqDone = (d.done?.length||0) >= u.reqLvl;
+    const reqNodeMet = !u.reqNode || ((d.up[u.reqNode]||0) > 0);
+    const unlocked = reqDone && reqNodeMet;
+
+    let statusText = '';
+    if (!reqDone) statusText = `🔒 Требуетъ: ${u.city} (ур. ${u.reqLvl})`;
+    else if (!reqNodeMet) {
+       const reqNodeObj = UPG.find(x => x.key === u.reqNode);
+       statusText = `🔒 Требуетъ: ${reqNodeObj ? reqNodeObj.name : u.reqNode}`;
+    }
+
+    return `<div style="background:linear-gradient(180deg,rgba(212,168,75,.1),rgba(212,168,75,.03));border:1px solid ${unlocked?'rgba(212,168,75,.25)':'rgba(255,80,60,.3)'};border-radius:10px;padding:18px;backdrop-filter:blur(12px);display:flex;flex-direction:column;gap:10px; opacity:${unlocked?1:0.5}; position:relative; grid-row: ${u.tier};">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;">
         <span style="font-family:'IM Fell English SC',serif;font-size:18px;color:#f0d080;">${u.name}</span>
-        <span style="font-size:12px;color:rgba(240,208,128,.7);border:1px solid rgba(212,168,75,.3);border-radius:999px;padding:3px 10px;">${t('upgraded')} ${lvl}/${u.max}</span>
+        <span style="font-size:12px;color:rgba(240,208,128,.7);border:1px solid rgba(212,168,75,.3);border-radius:999px;padding:3px 10px;white-space:nowrap;">${t('upgraded')} ${lvl}/${u.max}</span>
       </div>
       <div style="font-size:12px;color:rgba(250,244,232,.55);font-family:'Cormorant Garamond',serif;font-style:italic;">${u.desc}</div>
       <div style="height:6px;background:rgba(255,255,255,.08);border-radius:999px;overflow:hidden;"><div style="height:100%;width:${lvl/u.max*100}%;background:linear-gradient(90deg,#d4a84b,#f0d080);"></div></div>
-      <button class="shop-btn" data-up="${u.key}" data-cost="${c}" ${maxed||!can?'disabled':''} style="width:100%;padding:12px;border-radius:6px;font-family:'IM Fell English SC',serif;font-size:14px;letter-spacing:.1em;text-transform:uppercase;cursor:${maxed?'not-allowed':'pointer'};border:1px solid;${maxed?'background:rgba(120,200,120,.1);color:rgba(120,200,120,.7);border-color:rgba(120,200,120,.3);':can?'background:linear-gradient(180deg,rgba(212,168,75,.2),rgba(212,168,75,.08));color:#f0d080;border-color:rgba(212,168,75,.4);':'background:rgba(255,255,255,.03);color:rgba(240,208,128,.3);border-color:rgba(212,168,75,.1);'}">${maxed?t('maxed'):can?`${t('upgrade')} · ${c}`:t('notEnoughCoins')}</button>
+      ${!unlocked ? `<div style="font-size:11px; color:#ff8a80; text-align:center; padding: 4px; background:rgba(255,0,0,0.1); border-radius:4px;">${statusText}</div>` : ''}
+      <button class="shop-btn" data-up="${u.key}" data-cost="${c}" ${maxed||!can||!unlocked?'disabled':''} style="width:100%;padding:12px;border-radius:6px;font-family:'IM Fell English SC',serif;font-size:14px;letter-spacing:.1em;text-transform:uppercase;cursor:${maxed||!unlocked?'not-allowed':'pointer'};border:1px solid;${maxed?'background:rgba(120,200,120,.1);color:rgba(120,200,120,.7);border-color:rgba(120,200,120,.3);':(can&&unlocked)?'background:linear-gradient(180deg,rgba(212,168,75,.2),rgba(212,168,75,.08));color:#f0d080;border-color:rgba(212,168,75,.4);':'background:rgba(255,255,255,.03);color:rgba(240,208,128,.3);border-color:rgba(212,168,75,.1);'}">${maxed?t('maxed'):(can&&unlocked)?`${t('upgrade')} · ${c}`:t('notEnoughCoins')}</button>
       <button class="lore-btn" data-lore="${u.key}" style="width:100%;padding:8px;border-radius:6px;font-family:'IM Fell English SC',serif;font-size:12px;background:transparent;color:rgba(212,168,75,.6);border:1px dashed rgba(212,168,75,.3);cursor:pointer;">${t('readLore')}</button>
     </div>`;
   }
 
-  function planeCard(p,d){
-    const owned=(d.planes||['murma']).includes(p.id), sel=(d.plane||'murma')===p.id, can=(d.coins||0)>=p.cost;
-    const S=window.PlanesSVG||{render:()=>'',statRow:()=>''};
-    return `<div style="background:linear-gradient(180deg,rgba(212,168,75,.1),rgba(212,168,75,.03));border:1px solid ${sel?'rgba(120,200,120,.5)':'rgba(212,168,75,.25)'};border-radius:10px;padding:16px;backdrop-filter:blur(12px);">
-      <div style="height:96px;background:radial-gradient(ellipse at 50% 30%, rgba(255,255,255,.1), rgba(0,0,0,.2));border-radius:8px;margin-bottom:10px;">${S.render(p,{shop:true})}</div>
-      <div style="font-family:'IM Fell English SC',serif;font-size:16px;color:#f0d080;">${p.name} ${p.premium?'💎':''}</div>
-      <div style="display:flex;gap:6px;margin:8px 0;">
-        <button class="shop-btn" data-planemore="${p.id}" style="flex:1;padding:9px;border-radius:6px;font-family:'IM Fell English SC',serif;font-size:12px;background:rgba(255,255,255,.06);color:rgba(240,208,128,.8);border:1px dashed rgba(212,168,75,.4);cursor:pointer;">${t('details')}</button>
-      </div>
-      <button class="shop-btn" data-plane="${p.id}" ${sel?'disabled':''} style="width:100%;padding:11px;border-radius:6px;font-family:'IM Fell English SC',serif;font-size:13px;text-transform:uppercase;cursor:${sel?'not-allowed':'pointer'};border:1px solid;${sel?'background:rgba(120,200,120,.1);color:rgba(120,200,120,.7);border-color:rgba(120,200,120,.3);':owned?'background:rgba(120,180,255,.12);color:#a8d0ff;border-color:rgba(120,180,255,.4);':p.premium?'background:linear-gradient(180deg,#7a4a9a,#5a2f7d);color:#e8d0ff;border-color:rgba(200,150,255,.5);':can?'background:linear-gradient(180deg,rgba(212,168,75,.2),rgba(212,168,75,.08));color:#f0d080;border-color:rgba(212,168,75,.4);':'background:rgba(255,255,255,.03);color:rgba(240,208,128,.3);border-color:rgba(212,168,75,.1);'}">${sel?t('selected'):owned?t('take'):p.premium?`💎 ${p.rub} ₽`:can?`${t('buy')} · ${p.cost}`:t('notEnoughCoins')}</button>
-    </div>`;
-  }
-
-  function showPlaneModal(p){
-    let m=document.getElementById('planeModal'); 
-    if(!m){m=document.createElement('div');m.id='planeModal';m.style.cssText='position:fixed;inset:0;z-index:1000;display:none;align-items:center;justify-content:center;padding:24px;';document.body.appendChild(m);}
-    const S=window.PlanesSVG||{render:()=>'',statRow:()=>''};
-    const d=window.Save?.data||{};
-    const owned=(d.planes||['murma']).includes(p.id), sel=(d.plane||'murma')===p.id, can=(d.coins||0)>=p.cost;
-    m.innerHTML=`<div class="pb" style="position:absolute;inset:0;background:rgba(0,0,0,.8);backdrop-filter:blur(8px);"></div>
-      <div style="position:relative;max-width:640px;width:100%;background:linear-gradient(180deg,rgba(26,53,104,.97),rgba(10,31,68,.98));border:1px solid rgba(212,168,75,.4);border-radius:16px;padding:26px 30px;box-shadow:0 20px 60px rgba(0,0,0,.6);color:#faf4e8;max-height:90vh;overflow-y:auto;">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-          <div style="font-family:'IM Fell English SC',serif;font-size:24px;color:#f0d080;">${p.name} ${p.premium?'💎':''}</div>
-          <button class="pc" style="background:none;border:none;color:rgba(250,244,232,.6);font-size:22px;cursor:pointer;">✕</button>
-        </div>
-        <div style="height:220px;background:radial-gradient(ellipse at 50% 30%, rgba(255,255,255,.12), rgba(0,0,0,.25));border-radius:12px;margin-bottom:14px;">${S.render(p,{shop:true})}</div>
-        <div style="font-family:'Cormorant Garamond',serif;font-style:italic;font-size:14px;color:rgba(250,244,232,.7);margin-bottom:14px;">${p.lore}</div>
-        <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:16px;">
-          ${S.statRow(t('speed'),p.st.speed)}${S.statRow(t('durability'),p.st.hp)}${S.statRow(t('damage'),p.st.dmg)}${S.statRow(t('tank'),p.st.fuel)}
-        </div>
-        <button class="pbuy" ${sel?'disabled':''} style="width:100%;padding:13px;border-radius:8px;font-family:'IM Fell English SC',serif;font-size:15px;text-transform:uppercase;cursor:${sel?'not-allowed':'pointer'};border:1px solid;${sel?'background:rgba(120,200,120,.1);color:rgba(120,200,120,.7);border-color:rgba(120,200,120,.3);':owned?'background:rgba(120,180,255,.12);color:#a8d0ff;border-color:rgba(120,180,255,.4);':p.premium?'background:linear-gradient(180deg,#7a4a9a,#5a2f7d);color:#e8d0ff;border-color:rgba(200,150,255,.5);':can?'background:linear-gradient(180deg,#f5dfa0,#d4a84b 45%,#a67c2e);color:#1a0f00;font-weight:700;border-color:rgba(255,235,160,.6);':'background:rgba(255,255,255,.03);color:rgba(240,208,128,.3);border-color:rgba(212,168,75,.1);'}">${sel?t('selected'):owned?t('take'):p.premium?`💎 ${p.rub} ₽`:can?`${t('buy')} · ${p.cost}`:t('notEnoughCoins')}</button>
-      </div>`;
-    m.style.display='flex';
-    const close=()=>m.style.display='none';
-    m.querySelector('.pb').onclick=close; m.querySelector('.pc').onclick=close;
-    m.querySelector('.pbuy').onclick=()=>{
-      if(!d.planes)d.planes=[(window.PLANES&&window.PLANES[0].id)||'murma'];
-      if(d.planes.includes(p.id)){
-        d.plane=p.id; window.Save.save(); window.Sound?.click?.(); window.UI?.toast?.(t('planeChanged'),'success');
-      } else if(p.premium){
-        d.planes.push(p.id); d.plane=p.id; window.Save.save(); window.Sound?.coin?.(); window.UI?.toast?.(t('purchaseSuccess',{item:p.name}),'success');
-      } else if((d.coins||0)>=p.cost){
-        d.coins-=p.cost; d.planes.push(p.id); d.plane=p.id; window.Save.save(); window.Sound?.coin?.(); window.UI?.toast?.(t('purchaseSuccess',{item:p.name}),'success');
-      } else {
-        window.UI?.toast?.(t('notEnough'),'warn'); return;
-      }
-      close(); renderShop();
-    };
-    window.Sound?.click?.();
-  }
 
   function showLoreModal(u){
     let m=document.getElementById('loreModal');
@@ -175,7 +137,9 @@
             ${tabs.map(tab=>`<button class="tab-btn" data-tab="${tab.id}" style="${activeTab===tab.id?'background:linear-gradient(180deg,#f5dfa0,#d4a84b 45%,#a67c2e);color:#1a0f00;font-weight:700;border-color:rgba(255,235,160,.6);':'background:rgba(255,255,255,.05);color:rgba(240,208,128,.7);border-color:rgba(212,168,75,.25);'}">${tab.label}</button>`).join('')}
           </div>
           <div style="flex:1;overflow-y:auto;padding:0 24px 48px;">
-            <div style="max-width:900px;margin:0 auto;display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px;animation:fadeIn .6s ease-out;">${content}</div>
+            <div style="max-width:900px;margin:0 auto;display:grid;${activeTab==='up'?'grid-template-columns:1fr; gap:20px;':'grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px;'}animation:fadeIn .6s ease-out;">
+              ${activeTab==='up' ? `<div style="display:grid; gap:20px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); grid-auto-rows: min-content; position: relative;">${content}</div>` : content}
+            </div>
           </div>
         </div>`;
       setup(); log('✓ Ряды отрисованы');
@@ -187,23 +151,6 @@
     document.querySelector('[data-go="menu"]').onclick=()=>{window.Sound?.click?.();window.Screens?.show?.('menu');};
     document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{window.Sound?.click?.();activeTab=b.getAttribute('data-tab');renderShop();});
     document.querySelectorAll('[data-lore]').forEach(b=>b.onclick=()=>{const u=UPG.find(x=>x.key===b.getAttribute('data-lore'));if(u)showLoreModal(u);});
-    document.querySelectorAll('[data-planemore]').forEach(b=>b.onclick=()=>{
-      const p=(window.PLANES||[]).find(x=>x.id===b.getAttribute('data-planemore')); if(p)showPlaneModal(p);
-    });
-    document.querySelectorAll('[data-plane]').forEach(b=>b.onclick=()=>{
-      const id=b.getAttribute('data-plane'); const p=(window.PLANES||[]).find(x=>x.id===id); if(!p)return;
-      if(!d.planes)d.planes=[(window.PLANES&&window.PLANES[0].id)||'murma'];
-      if(d.planes.includes(id)){
-        d.plane=id; window.Save.save(); window.Sound?.click?.(); window.UI?.toast?.(t('planeChanged'),'success');
-      } else if(p.premium){
-        d.planes.push(id); d.plane=id; window.Save.save(); window.Sound?.coin?.(); window.UI?.toast?.(t('purchaseSuccess',{item:p.name}),'success');
-      } else if((d.coins||0)>=p.cost){
-        d.coins-=p.cost; d.planes.push(id); d.plane=id; window.Save.save(); window.Sound?.coin?.(); window.UI?.toast?.(t('purchaseSuccess',{item:p.name}),'success');
-      } else {
-        window.UI?.toast?.(t('notEnough'),'warn'); return;
-      }
-      renderShop();
-    });
     document.querySelectorAll('[data-up]').forEach(b=>b.onclick=()=>{
       const k=b.getAttribute('data-up'), c=+b.getAttribute('data-cost'); const u=UPG.find(x=>x.key===k); const l=d.up[k]||0;
       if(u && l<u.max && (d.coins||0)>=c){

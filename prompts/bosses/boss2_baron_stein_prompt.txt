@@ -1,0 +1,7 @@
+
+Create a highly detailed, 2D game asset sprite for a boss character.
+Name: Baron Stein
+Description/Concept: A sniper dog in a sleek, fast monoplane with a long barrel extending from the nose.
+Art Style: Early 1900s aviation meets animal characters (dogs vs cats), steampunk/dieselpunk elements, hand-drawn aesthetic similar to Studio Ghibli but slightly grittier.
+Perspective: Top-down or slight isometric view, suitable for a vertical scrolling shoot 'em up game.
+Background: Transparent or solid green chroma key.

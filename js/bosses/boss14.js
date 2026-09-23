@@ -1,9 +1,9 @@
 (function(){if(!window.BossRegistry)return;
 window.BossRegistry.register('boss14',{
-name:'Желѣзный Мяу',type:'sniper',color:'#6a6a7a',hp:380,rate:1.6,size:2.0,
-bg:['#4a4a5a','#7a7a8a','#aaaabb'],music:'boss14',
-taunt:'«Желѣзный законъ!»',
-tune:{bulletSpeed:360,telegraph:0.35},
-prop:[27,48,0.86],
-update:(b,dt,E)=>{b.a=(b.a||0)+dt;if(b.a>2.8){b.a=0;b.y+=Math.sin(b.t*4)*60;}}
+name:'Княжна Метель',type:'ace',color:'#aaddff',hp:210,rate:0.8,size:1.6,
+bg:['#113344','#224455','#335566'],music:'boss14',
+taunt:'«Замерзни во льдахъ!»',
+tune:{bulletSpeed:240,spread:6,telegraph:0.5},
+prop:[35,45,0.9],
+update:(b,dt,E)=>{b.t=(b.t||0)+dt;b.x += Math.sin(b.t * 1.5) * 90; b.y += Math.cos(b.t) * 30; if (Math.random() < 0.05) b.fire();}
 });})();

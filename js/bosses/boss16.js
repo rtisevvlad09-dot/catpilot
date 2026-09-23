@@ -1,9 +1,9 @@
 (function(){if(!window.BossRegistry)return;
 window.BossRegistry.register('boss16',{
-name:'Багровый Рыкъ',type:'swarm',color:'#8a2a2a',hp:420,rate:1.8,size:2.2,
-bg:['#4a1a1a','#7a2a2a','#aa3a3a'],music:'boss16',
-taunt:'«Мой рыкъ — орды!»',
-tune:{minion:1.5},
-prop:[34,49,0.96],
-update:(b,dt,E)=>{b.a=(b.a||0)+dt;if(b.a>1.0){b.a=0;for(let i=0;i<3;i++)E.minion();}}
+name:'Старшина Гроза',type:'ace',color:'#cccc00',hp:260,rate:1.5,size:2.0,
+bg:['#333300','#444400','#555500'],music:'boss16',
+taunt:'«Молнія бьётъ дважды!»',
+tune:{bulletSpeed:400,spread:2,telegraph:0.6},
+prop:[35,45,0.9],
+update:(b,dt,E)=>{b.t=(b.t||0)+dt;b.x = Math.random() < 0.02 ? Math.random()*window.innerWidth : b.x; b.y = 100; if (Math.random() < 0.05) b.fire();}
 });})();

@@ -1,9 +1,9 @@
 (function(){if(!window.BossRegistry)return;
 window.BossRegistry.register('boss12',{
-name:'Баронъ Мурръ',type:'dash',color:'#3a2a5a',hp:340,rate:1.2,size:2.0,
-bg:['#2a1a4a','#4a3a7a','#6a5aaa'],music:'boss12',
-taunt:'«Я быстрее страха!»',
-tune:{dashMul:1.7,telegraph:0.4},
-prop:[19,51,0.68],
-update:(b,dt,E)=>{b.a=(b.a||0)+dt;if(b.a>4){b.a=0;b.y=E.H/2+Math.random()*300-150;}}
+name:'Графиня Ночь',type:'ace',color:'#440066',hp:180,rate:0.7,size:1.5,
+bg:['#110022','#220033','#330044'],music:'boss12',
+taunt:'«Тьма поглотитъ тебя!»',
+tune:{bulletSpeed:300,spread:2,telegraph:0.4},
+prop:[35,45,0.9],
+update:(b,dt,E)=>{b.t=(b.t||0)+dt;b.y = 100 + Math.sin(b.t * 3) * 60; b.x = window.innerWidth/2 + Math.cos(b.t * 2) * 100; if (Math.random() < 0.06) b.fire();}
 });})();

@@ -147,22 +147,6 @@
             <button id="btnRefuel" class="gauge-btn" ${fuelFull || coins < fuelCost ? 'disabled' : ''}>${fuelFull ? t('full') : t('refuel') + ' · 🪙' + fuelCost}</button>
           </div>
         </div>
-        ${planes.length > 1 ? `
-          <div style="max-width:700px;width:100%;margin:0 auto;padding:0 24px 16px;">
-            <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">
-              <div style="flex:1;height:1px;background:linear-gradient(90deg,transparent,rgba(212,168,75,.3));"></div>
-              <span style="font-family:'IM Fell English SC',serif;font-size:13px;color:rgba(240,208,128,.6);letter-spacing:.12em;text-transform:uppercase;">${t('choosePlane')}</span>
-              <div style="flex:1;height:1px;background:linear-gradient(90deg,rgba(212,168,75,.3),transparent);"></div>
-            </div>
-            <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;">
-              ${planes.map(pl => {
-                const owned = (d.planes || ['murma']).includes(pl.id);
-                const sel = curPlaneId === pl.id;
-                return `<button class="plane-pick ${owned ? 'owned' : ''} ${sel ? 'selected' : ''}" data-pick="${pl.id}" title="${pl.name}" ${owned ? '' : 'disabled'}>${window.PlanesSVG ? window.PlanesSVG.render(pl, { shop: true }) : '<span style="font-size:10px;color:rgba(240,208,128,.4);">' + pl.name + '</span>'}</button>`;
-              }).join('')}
-            </div>
-          </div>
-        ` : ''}
         <div style="max-width:700px;width:100%;margin:0 auto;padding:0 24px 16px;">
           <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">
             <div style="flex:1;height:1px;background:linear-gradient(90deg,transparent,rgba(212,168,75,.3));"></div>
@@ -223,19 +207,6 @@
       try { window.Sound?.click?.(); } catch (e) {}
       if (window.Screens?.show) window.Screens.show('shop');
     };
-    
-    document.querySelectorAll('[data-pick]').forEach(b => b.onclick = () => {
-      const id = b.getAttribute('data-pick');
-      if (!(d.planes || ['murma']).includes(id)) {
-        if (window.UI?.toast) window.UI.toast(t('buyInShop'), 'warn');
-        return;
-      }
-      d.plane = id;
-      window.Save.save();
-      try { window.Sound?.click?.(); } catch (e) {}
-      if (window.UI?.toast) window.UI.toast(t('planeChanged'), 'success');
-      renderHangar();
-    });
     
     const br = document.getElementById('btnRepair');
     if (br) br.onclick = () => {

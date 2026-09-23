@@ -1,9 +1,9 @@
 (function(){if(!window.BossRegistry)return;
 window.BossRegistry.register('boss7',{
-name:'Стальной Коготь',type:'ace',color:'#5a5a6a',hp:240,rate:1.3,size:1.9,
-bg:['#3a3a4a','#6a6a7a','#9a9aaa'],music:'boss7',
-taunt:'«Когти рвутъ звѣзды!»',
-tune:{bulletSpeed:310,spread:4},
-prop:[28,47,0.9],
-update:(b,dt,E)=>{b.a=(b.a||0)+dt;if(b.a>2){b.a=0;b.x-=30;setTimeout(()=>b.x+=30,400);}}
+name:'Полковникъ Громъ',type:'ace',color:'#555555',hp:400,rate:4.0,size:2.8,
+bg:['#222','#333','#444'],music:'boss7',
+taunt:'«Я сотру тебя въ порошокъ!»',
+tune:{bulletSpeed:180,spread:8,telegraph:1.5},
+prop:[35,45,0.9],
+update:(b,dt,E)=>{b.t=(b.t||0)+dt;b.x = window.innerWidth/2 + Math.sin(b.t * 0.5) * 100; if (b.t % 4 < 0.1) { for(let i=0;i<5;i++) b.fire(); }}
 });})();

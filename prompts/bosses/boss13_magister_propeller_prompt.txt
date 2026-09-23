@@ -1,0 +1,7 @@
+
+Create a highly detailed, 2D game asset sprite for a boss character.
+Name: Magister Propeller
+Description/Concept: A bizarre, experimental aircraft with an absurd amount of propellers.
+Art Style: Early 1900s aviation meets animal characters (dogs vs cats), steampunk/dieselpunk elements, hand-drawn aesthetic similar to Studio Ghibli but slightly grittier.
+Perspective: Top-down or slight isometric view, suitable for a vertical scrolling shoot 'em up game.
+Background: Transparent or solid green chroma key.

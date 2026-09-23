@@ -1,9 +1,9 @@
 (function(){if(!window.BossRegistry)return;
 window.BossRegistry.register('boss17',{
-name:'Серебряный Клыкъ',type:'burst',color:'#c8c8d8',hp:440,rate:1.7,size:2.1,
-bg:['#8a8a9a','#b8b8c8','#e8e8f8'],music:'boss17',
-taunt:'«Клыкъ пронзаетъ небо!»',
-tune:{bulletSpeed:310,ring:14},
-prop:[43,54,1,2],
-update:(b,dt,E)=>{b.ang=(b.ang||0)+dt*4;if(b.ang>6.28){b.ang=0;b.y+=Math.cos(b.t*3)*70;}}
+name:'Графъ Рикошетъ',type:'ace',color:'#22ff22',hp:170,rate:0.4,size:1.3,
+bg:['#002200','#003300','#004400'],music:'boss17',
+taunt:'«Мои пули найдутъ тебя!»',
+tune:{bulletSpeed:200,spread:10,telegraph:0.2},
+prop:[35,45,0.9],
+update:(b,dt,E)=>{b.t=(b.t||0)+dt;b.x += b.dx || 5; if(b.x < 0 || b.x > window.innerWidth) b.dx = -(b.dx || 5); b.y = 80 + Math.sin(b.t)*20; if (Math.random() < 0.08) b.fire();}
 });})();

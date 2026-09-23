@@ -1,9 +1,9 @@
 (function(){if(!window.BossRegistry)return;
 window.BossRegistry.register('boss13',{
-name:'Адмиралъ Когтей',type:'ace',color:'#2a4a6a',hp:360,rate:1.2,size:2.1,
-bg:['#1a3a5a','#2a5a8a','#3a7aba'],music:'boss13',
-taunt:'«Мой флотъ — котики!»',
-tune:{bulletSpeed:320,spread:5},
-prop:[32,46,0.91],
-update:(b,dt,E)=>{b.a=(b.a||0)+dt;if(b.a>2.5){b.a=0;b.x-=40;setTimeout(()=>b.x+=40,350);}}
+name:'Магистръ Винтъ',type:'ace',color:'#aa6622',hp:200,rate:0.5,size:1.7,
+bg:['#332211','#443311','#554422'],music:'boss13',
+taunt:'«Мои расчёты безупречны!»',
+tune:{bulletSpeed:350,spread:8,telegraph:0.3},
+prop:[35,45,0.9],
+update:(b,dt,E)=>{b.t=(b.t||0)+dt;b.a = (b.a || 0) + 0.05; b.x = window.innerWidth/2 + Math.sin(b.a * 5) * 100; b.y = 100 + Math.cos(b.a * 3) * 50; if (b.t % 1 < 0.1) b.fire();}
 });})();

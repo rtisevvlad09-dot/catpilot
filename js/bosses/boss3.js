@@ -1,9 +1,9 @@
 (function(){if(!window.BossRegistry)return;
 window.BossRegistry.register('boss3',{
-name:'Купецъ Брюхатый',type:'bomber',color:'#2f5a2f',hp:160,rate:1.1,size:2.0,
-bg:['#3a4a2a','#6a7a4a','#9aaa6a'],music:'boss3',
-taunt:'«Закидаю тебя бомбами!»',
-tune:{bulletSpeed:260},
-prop:[32,45,1.0],
-update:(b,dt,E)=>{b.a=(b.a||0)+dt;if(b.a>4){b.a=0;for(let i=0;i<3;i++)E.minion();}}
+name:'Купецъ Брюхатый',type:'ace',color:'#aa8822',hp:300,rate:1.2,size:3.0,
+bg:['#443311','#665522','#887733'],music:'boss3',
+taunt:'«Мои деньги — моя броня!»',
+tune:{bulletSpeed:150,spread:7,telegraph:1.0},
+prop:[35,45,0.9],
+update:(b,dt,E)=>{b.t=(b.t||0)+dt;b.x += Math.sin(b.t) * 50; if (Math.random() < 0.05) b.fire();}
 });})();
